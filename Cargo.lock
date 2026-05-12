@@ -816,9 +816,18 @@ name = "ceremony-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ark-bn254 0.6.0",
+ "ark-circom",
+ "ark-ff 0.6.0",
+ "ark-groth16",
+ "ark-serialize 0.6.0",
+ "circuit-keys",
  "clap",
  "getrandom 0.2.17",
  "glob",
+ "num-bigint",
+ "serde",
+ "serde_json",
  "shlex",
  "zeroize",
 ]
@@ -877,6 +886,7 @@ name = "circom-groth16-verifier"
 version = "0.1.0"
 dependencies = [
  "ark-bn254 0.6.0",
+ "ark-circom",
  "ark-ff 0.6.0",
  "ark-groth16",
  "ark-relations",
@@ -897,6 +907,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "circuit-keys"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ark-bn254 0.6.0",
+ "ark-ff 0.6.0",
+ "ark-groth16",
+ "ark-serialize 0.6.0",
+ "num-bigint",
+ "serde_json",
+]
+
+[[package]]
 name = "circuits"
 version = "0.1.0"
 dependencies = [
@@ -908,6 +931,7 @@ dependencies = [
  "ark-serialize 0.6.0",
  "ark-snark",
  "ark-std 0.6.0",
+ "circuit-keys",
  "compiler",
  "constraint_generation",
  "constraint_writers",
@@ -3675,6 +3699,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ark-bn254 0.6.0",
+ "ark-circom",
  "ark-ff 0.6.0",
  "ark-groth16",
  "ark-relations",
@@ -5739,6 +5764,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "sha2 0.11.0",
  "sqlite-wasm-rs",
  "sqlite-wasm-vfs",
  "state",
