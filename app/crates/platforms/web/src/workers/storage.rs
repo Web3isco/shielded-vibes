@@ -203,6 +203,14 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
             kick_processor();
             StorageWorkerResponse::Saved
         }
+        StorageWorkerRequest::SaveSyncProgress(metadata, fully_indexed) => {
+            log::trace!(
+                "[{WORKER_NAME}] saving bulk sync progress for {} contracts, fully={fully_indexed}",
+                metadata.len()
+            );
+            with_storage_mut!(s => s.save_sync_progress(&metadata, fully_indexed)?)?;
+            StorageWorkerResponse::Saved
+        }
         StorageWorkerRequest::DeriveSaveUserKeys(
             address,
             spending_signature,
@@ -291,6 +299,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                 load_user_key_material(&req.user_address)?;
 
             let membership_proof = match build_membership_proof(
+                &req.aspmem_contract_id,
                 &note_pubkey,
                 req.membership_blinding,
                 req.aspmem_root,
@@ -308,7 +317,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
             let outputs = (0..N_OUTPUTS)
                 .map(|i| {
                     Ok(TransactOutput {
-                        amount_stroops: req.output_amounts[i],
+                        amount: req.output_amounts[i],
                         blinding: generate_random_blinding()?,
                         recipient_note_pubkey: Some(note_pubkey.clone()),
                         recipient_encryption_pubkey: Some(encryption_pubkey.clone()),
@@ -321,7 +330,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                 encryption_pubkey,
                 pool_root,
                 pool_address: req.pool_address,
-                amount_stroops: req.amount_stroops,
+                amount: req.amount,
                 outputs,
                 membership_proof,
                 non_membership_proof: req.non_membership_proof,
@@ -344,6 +353,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                 load_user_key_material(&req.user_address)?;
 
             let membership_proof = match build_membership_proof(
+                &req.aspmem_contract_id,
                 &note_pubkey,
                 req.membership_blinding,
                 req.aspmem_root,
@@ -360,6 +370,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
 
             let inputs = match build_pool_inputs(
                 &req.user_address,
+                &req.pool_address,
                 req.pool_next_index,
                 req.tree_depth,
                 pool_root,
@@ -372,7 +383,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
             let mut withdraw_amount = types::ExtAmount::ZERO;
             for i in &inputs {
                 withdraw_amount = withdraw_amount
-                    .checked_add(types::ExtAmount::from(i.amount_stroops))
+                    .checked_add(types::ExtAmount::try_from(i.amount)?)
                     .ok_or_else(|| anyhow::anyhow!("withdraw amount overflow"))?;
             }
 
@@ -381,7 +392,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                 encryption_pubkey,
                 pool_root,
                 withdraw_recipient: req.withdraw_recipient,
-                withdraw_amount_stroops: withdraw_amount,
+                withdraw_amount,
                 inputs,
                 outputs: None,
                 membership_proof,
@@ -405,6 +416,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                 load_user_key_material(&req.user_address)?;
 
             let membership_proof = match build_membership_proof(
+                &req.aspmem_contract_id,
                 &note_pubkey,
                 req.membership_blinding,
                 req.aspmem_root,
@@ -421,6 +433,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
 
             let inputs = match build_pool_inputs(
                 &req.user_address,
+                &req.pool_address,
                 req.pool_next_index,
                 req.tree_depth,
                 pool_root,
@@ -433,7 +446,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
             let outputs = (0..N_OUTPUTS)
                 .map(|i| {
                     Ok(TransactOutput {
-                        amount_stroops: req.output_amounts[i],
+                        amount: req.output_amounts[i],
                         blinding: generate_random_blinding()?,
                         recipient_note_pubkey: Some(req.recipient_note_pubkey.clone()),
                         recipient_encryption_pubkey: Some(req.recipient_encryption_pubkey.clone()),
@@ -469,6 +482,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                 load_user_key_material(&req.user_address)?;
 
             let membership_proof = match build_membership_proof(
+                &req.aspmem_contract_id,
                 &note_pubkey,
                 req.membership_blinding,
                 req.aspmem_root,
@@ -485,6 +499,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
 
             let inputs = match build_pool_inputs(
                 &req.user_address,
+                &req.pool_address,
                 req.pool_next_index,
                 req.tree_depth,
                 pool_root,
@@ -504,7 +519,7 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
                     )));
                 }
                 outputs.push(TransactOutput {
-                    amount_stroops: req.output_amounts[i],
+                    amount: req.output_amounts[i],
                     blinding: generate_random_blinding()?,
                     recipient_note_pubkey: note_pk,
                     recipient_encryption_pubkey: enc_pk,
@@ -561,6 +576,7 @@ fn load_user_key_material(
 }
 
 fn build_membership_proof(
+    aspmem_contract_id: &str,
     note_pubkey: &NotePublicKey,
     membership_blinding: Field,
     aspmem_root: Field,
@@ -569,6 +585,7 @@ fn build_membership_proof(
 ) -> Result<std::result::Result<AspMembershipProof, AspMembershipSync>> {
     let user_leaf = asp_membership_leaf(note_pubkey, &membership_blinding)?;
     let user_leaf_index = match with_storage!(s => s.check_asp_membership_precondition(
+        aspmem_contract_id,
         &user_leaf,
         &aspmem_root,
         aspmem_ledger
@@ -581,7 +598,7 @@ fn build_membership_proof(
     };
 
     let asp_membership_merkle_tree_leaves =
-        with_storage!(s => s.get_all_asp_membership_leaves_ordered()?)?;
+        with_storage!(s => s.get_all_asp_membership_leaves_ordered(aspmem_contract_id)?)?;
     let aspmembership_tree =
         MerklePrefixTree::new(tree_depth, &asp_membership_merkle_tree_leaves)?.into_built();
     let MerkleProof {
@@ -602,6 +619,7 @@ fn build_membership_proof(
 
 fn build_pool_inputs(
     user_address: &str,
+    pool_address: &str,
     pool_next_index: u32,
     tree_depth: u32,
     expected_pool_root: Field,
@@ -611,7 +629,7 @@ fn build_pool_inputs(
         return Ok(Ok(Vec::new()));
     }
 
-    let leaves = with_storage!(s => s.get_pool_commitment_leaves_ordered()?)?;
+    let leaves = with_storage!(s => s.get_pool_commitment_leaves_ordered(pool_address)?)?;
 
     if leaves.len() != pool_next_index as usize {
         log::info!(
@@ -631,7 +649,7 @@ fn build_pool_inputs(
     let mut out = Vec::with_capacity(input_commitments.len());
     for commitment in input_commitments {
         let (amount, blinding, leaf_index) =
-            with_storage!(s => s.get_unspent_user_note_by_commitment(user_address, commitment)?)?
+            with_storage!(s => s.get_unspent_user_note_by_commitment(pool_address, user_address, commitment)?)?
                 .ok_or_else(|| {
                 anyhow::anyhow!("unspent note not found for commitment {}", commitment)
             })?;
@@ -643,7 +661,7 @@ fn build_pool_inputs(
         } = tree.proof(leaf_index)?;
 
         out.push(TransactInputNote {
-            amount_stroops: amount,
+            amount,
             blinding,
             merkle_path_elements: path_elements,
             merkle_path_indices: path_indices,

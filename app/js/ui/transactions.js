@@ -21,6 +21,14 @@ async function getContractConfig() {
     return cachedContractConfig;
 }
 
+function getActivePoolContractId(config) {
+    const pools = Array.isArray(config?.pools) ? config.pools : [];
+    const selected = pools.find(p => p?.enabled) || pools[0];
+    const poolContractId = selected?.poolContractId;
+    if (!poolContractId) throw new Error("Pool contract ID not available");
+    return poolContractId;
+}
+
 function noteAmountToStroopsBigInt(amount) {
     if (amount == null) return 0n;
     if (typeof amount === 'bigint') return amount;
@@ -40,7 +48,12 @@ function noteAmountToStroopsBigInt(amount) {
     return 0n;
 }
 
-const STROOPS_PER_XLM = 10_000_000n;
+let TOKEN_DECIMALS = 7;
+let TOKEN_SYMBOL = "XLM";
+
+function baseUnitsPerToken() {
+    return 10n ** BigInt(TOKEN_DECIMALS);
+}
 
 function tryParseXlmToStroopsBigInt(xlmText, { allowNegative = false } = {}) {
     const raw = xlmText == null ? '' : String(xlmText);
@@ -69,12 +82,12 @@ function tryParseXlmToStroopsBigInt(xlmText, { allowNegative = false } = {}) {
     let fracVal = 0n;
     try {
         intVal = intPart ? BigInt(intPart) : 0n;
-        fracVal = fracPart ? BigInt(fracPart.padEnd(7, '0')) : 0n;
+        fracVal = fracPart ? BigInt(fracPart.padEnd(TOKEN_DECIMALS, '0')) : 0n;
     } catch {
         return { ok: false, error: 'Invalid amount.' };
     }
 
-    const abs = intVal * STROOPS_PER_XLM + fracVal;
+    const abs = intVal * baseUnitsPerToken() + fracVal;
     const isNegative = signChar === '-';
     if (isNegative && !allowNegative && abs !== 0n) {
         return { ok: false, error: 'Amount must be non-negative.' };
@@ -83,20 +96,20 @@ function tryParseXlmToStroopsBigInt(xlmText, { allowNegative = false } = {}) {
     return { ok: true, value: isNegative ? -abs : abs };
 }
 
-function xlmToStroopsBigInt(xlm, opts) {
-    const res = tryParseXlmToStroopsBigInt(xlm, opts);
+function decimalToBaseUnitsBigInt(amount, opts) {
+    const res = tryParseXlmToStroopsBigInt(amount, opts);
     if (!res.ok) throw new Error(res.error);
     return res.value;
 }
 
-function stroopsBigIntToXlmText(stroops) {
-    let v = typeof stroops === 'bigint' ? stroops : 0n;
+function baseUnitsBigIntToDecimalText(baseUnits) {
+    let v = typeof baseUnits === 'bigint' ? baseUnits : 0n;
     const isNeg = v < 0n;
     if (isNeg) v = -v;
 
-    const absStr = v.toString().padStart(8, '0');
-    const intPart = absStr.slice(0, -7);
-    const fracRaw = absStr.slice(-7);
+    const absStr = v.toString().padStart(TOKEN_DECIMALS + 1, '0');
+    const intPart = absStr.slice(0, -TOKEN_DECIMALS);
+    const fracRaw = absStr.slice(-TOKEN_DECIMALS);
     const frac = fracRaw.replace(/0+$/, '');
     const out = frac ? `${intPart}.${frac}` : intPart;
     return isNeg ? `-${out}` : out;
@@ -160,7 +173,7 @@ function collectNoteIds(containerId) {
 function collectOutputAmounts(containerId) {
     const out = [];
     document.querySelectorAll(`#${containerId} .output-amount`).forEach(input => {
-        out.push(xlmToStroopsBigInt(input.value, { allowNegative: false }));
+        out.push(decimalToBaseUnitsBigInt(input.value, { allowNegative: false }));
     });
     while (out.length < N_OUTPUTS) out.push(0n);
     return out.slice(0, N_OUTPUTS);
@@ -223,7 +236,7 @@ function updateWithdrawTotal() {
     const inputs = document.getElementById('withdraw-inputs');
     if (!totalEl || !inputs) return;
     const totalStroops = sumInputNotesStroops('withdraw-inputs');
-    totalEl.textContent = `${stroopsBigIntToXlmText(totalStroops)} XLM`;
+    totalEl.textContent = `${baseUnitsBigIntToDecimalText(totalStroops)} ${TOKEN_SYMBOL}`;
 }
 
 function updateTransferBalance() {
@@ -247,8 +260,8 @@ function updateTransferBalance() {
         outputsTotalStroops += r.value;
     });
 
-    eq.querySelector('[data-eq="inputs"]').textContent = `Inputs: ${stroopsBigIntToXlmText(inputsTotalStroops)}`;
-    eq.querySelector('[data-eq="outputs"]').textContent = `Outputs: ${stroopsBigIntToXlmText(outputsTotalStroops)}`;
+    eq.querySelector('[data-eq="inputs"]').textContent = `Inputs: ${baseUnitsBigIntToDecimalText(inputsTotalStroops)}`;
+    eq.querySelector('[data-eq="outputs"]').textContent = `Outputs: ${baseUnitsBigIntToDecimalText(outputsTotalStroops)}`;
 
     const shouldShow = inputsTotalStroops !== 0n || outputsTotalStroops !== 0n || outputsAnyNonEmpty;
     const isBalanced =
@@ -282,11 +295,11 @@ function updateTransactBalance() {
     });
 
     const publicText = publicValid
-        ? `${publicStroops >= 0n ? '+' : ''}${stroopsBigIntToXlmText(publicStroops)}`
+        ? `${publicStroops >= 0n ? '+' : ''}${baseUnitsBigIntToDecimalText(publicStroops)}`
         : 'Invalid';
-    eq.querySelector('[data-eq="inputs"]').textContent = `Inputs: ${stroopsBigIntToXlmText(inputsTotalStroops)}`;
+    eq.querySelector('[data-eq="inputs"]').textContent = `Inputs: ${baseUnitsBigIntToDecimalText(inputsTotalStroops)}`;
     eq.querySelector('[data-eq="public"]').textContent = `Public: ${publicText}`;
-    eq.querySelector('[data-eq="outputs"]').textContent = `Outputs: ${stroopsBigIntToXlmText(outputsTotalStroops)}`;
+    eq.querySelector('[data-eq="outputs"]').textContent = `Outputs: ${baseUnitsBigIntToDecimalText(outputsTotalStroops)}`;
 
     const publicAnyNonEmpty = !!(amountEl.value && amountEl.value.trim());
     const shouldShow =
@@ -391,10 +404,10 @@ export const Transactions = {
             });
 
             eq.querySelector('[data-eq="input"]').textContent = `Deposit: ${
-                depositRes.ok ? stroopsBigIntToXlmText(depositRes.value) : 'Invalid'
+                depositRes.ok ? baseUnitsBigIntToDecimalText(depositRes.value) : 'Invalid'
             }`;
             eq.querySelector('[data-eq="outputs"]').textContent = `Outputs: ${
-                outputsValid ? stroopsBigIntToXlmText(outputsTotalStroops) : 'Invalid'
+                outputsValid ? baseUnitsBigIntToDecimalText(outputsTotalStroops) : 'Invalid'
             }`;
 
             const shouldShow = depositAnyNonEmpty || outputsAnyNonEmpty;
@@ -448,13 +461,16 @@ export const Transactions = {
 
                 const userAddress = App.state.wallet.address;
                 const membershipBlinding = parseMembershipBlinding('deposit-membership-blinding');
-                const amountStroops = xlmToStroopsBigInt(amount.value, { allowNegative: false });
+                const amountStroops = decimalToBaseUnitsBigInt(amount.value, { allowNegative: false });
                 const outputAmounts = collectOutputAmounts('deposit-outputs');
 
                 setLoading(btn, 'Validating…');
                 const onStatus = p => p?.message && setLoadingText(btn, p.message);
+	                const config = await getContractConfig();
+                const poolContractId = getActivePoolContractId(config);
 	                setLoadingText(btn, 'Proving…');
 	                const proved = await getHandle().webClient.proveDeposit(
+	                    poolContractId,
 	                    userAddress,
 	                    membershipBlinding,
 	                    amountStroops,
@@ -467,13 +483,12 @@ export const Transactions = {
 	                    return;
 	                }
 
-	                const config = await getContractConfig();
 	                setLoadingText(btn, 'Ready to sign…');
 	                const txHash = await submitProvedPoolTransact(proved, {
 	                    address: userAddress,
 	                    rpcUrl: App.state.wallet.sorobanRpcUrl,
 	                    networkPassphrase: App.state.wallet.networkPassphrase,
-	                    poolContractId: config?.pool,
+	                    poolContractId: poolContractId,
 	                }, { onStatus });
                 Toast.show(
                     `Submitted: ${Utils.truncateHex(txHash, 10, 8)}`,
@@ -510,8 +525,11 @@ export const Transactions = {
 
                 setLoading(btn, 'Validating…');
                 const onStatus = p => p?.message && setLoadingText(btn, p.message);
+	                const config = await getContractConfig();
+                const poolContractId = getActivePoolContractId(config);
 	                setLoadingText(btn, 'Proving…');
 	                const proved = await getHandle().webClient.proveWithdraw(
+	                    poolContractId,
 	                    userAddress,
 	                    membershipBlinding,
 	                    recipient,
@@ -523,13 +541,12 @@ export const Transactions = {
 	                    return;
 	                }
 
-	                const config = await getContractConfig();
 	                setLoadingText(btn, 'Ready to sign…');
 	                const txHash = await submitProvedPoolTransact(proved, {
 	                    address: userAddress,
 	                    rpcUrl: App.state.wallet.sorobanRpcUrl,
 	                    networkPassphrase: App.state.wallet.networkPassphrase,
-	                    poolContractId: config?.pool,
+	                    poolContractId: poolContractId,
 	                }, { onStatus });
                 Toast.show(
                     `Submitted: ${Utils.truncateHex(txHash, 10, 8)}`,
@@ -576,8 +593,11 @@ export const Transactions = {
 
                 setLoading(btn, 'Validating…');
                 const onStatus = p => p?.message && setLoadingText(btn, p.message);
+	                const config = await getContractConfig();
+                const poolContractId = getActivePoolContractId(config);
 	                setLoadingText(btn, 'Proving…');
 	                const proved = await getHandle().webClient.proveTransfer(
+	                    poolContractId,
 	                    userAddress,
 	                    membershipBlinding,
 	                    recipientNoteKey,
@@ -591,13 +611,12 @@ export const Transactions = {
 	                    return;
 	                }
 
-	                const config = await getContractConfig();
 	                setLoadingText(btn, 'Ready to sign…');
 	                const txHash = await submitProvedPoolTransact(proved, {
 	                    address: userAddress,
 	                    rpcUrl: App.state.wallet.sorobanRpcUrl,
 	                    networkPassphrase: App.state.wallet.networkPassphrase,
-	                    poolContractId: config?.pool,
+	                    poolContractId: poolContractId,
 	                }, { onStatus });
                 Toast.show(
                     `Submitted: ${Utils.truncateHex(txHash, 10, 8)}`,
@@ -646,7 +665,7 @@ export const Transactions = {
                 requireWalletReady();
                 const userAddress = App.state.wallet.address;
                 const membershipBlinding = parseMembershipBlinding('transact-membership-blinding');
-                const extAmountStroops = xlmToStroopsBigInt(amount.value, { allowNegative: true });
+                const extAmountStroops = decimalToBaseUnitsBigInt(amount.value, { allowNegative: true });
                 const extRecipient = document.getElementById('transact-recipient')?.value?.trim() || userAddress;
                 if (extAmountStroops < 0n && !extRecipient) {
                     throw new Error('Withdrawal recipient is required when public amount is negative');
@@ -659,8 +678,11 @@ export const Transactions = {
 
                 setLoading(btn, 'Validating…');
                 const onStatus = p => p?.message && setLoadingText(btn, p.message);
+	                const config = await getContractConfig();
+                const poolContractId = getActivePoolContractId(config);
 	                setLoadingText(btn, 'Proving…');
 	                const proved = await getHandle().webClient.proveTransact(
+	                    poolContractId,
 	                    userAddress,
 	                    membershipBlinding,
 	                    extRecipient,
@@ -676,13 +698,12 @@ export const Transactions = {
 	                    return;
 	                }
 
-	                const config = await getContractConfig();
 	                setLoadingText(btn, 'Ready to sign…');
 	                const txHash = await submitProvedPoolTransact(proved, {
 	                    address: userAddress,
 	                    rpcUrl: App.state.wallet.sorobanRpcUrl,
 	                    networkPassphrase: App.state.wallet.networkPassphrase,
-	                    poolContractId: config?.pool,
+	                    poolContractId: poolContractId,
 	                }, { onStatus });
                 Toast.show(
                     `Submitted: ${Utils.truncateHex(txHash, 10, 8)}`,

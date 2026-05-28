@@ -18,8 +18,8 @@ use prover::{
 use std::{rc::Rc, str::FromStr};
 use stellar::StateFetcher as CoreStateFetcher;
 use types::{
-    AspMembershipSync, EncryptionPublicKey, EncryptionSignature, ExtAmount, Field, NoteAmount,
-    NotePublicKey, SMT_DEPTH, SpendingSignature,
+    AspMembershipSync, ContractConfig, ContractsStateData, EncryptionPublicKey,
+    EncryptionSignature, ExtAmount, Field, NoteAmount, NotePublicKey, SMT_DEPTH, SpendingSignature,
 };
 use wasm_bindgen::{JsCast, prelude::*};
 
@@ -92,7 +92,7 @@ async fn with_timeout<T>(ms: u32, fut: impl std::future::Future<Output = T>) -> 
 }
 
 impl WebClient {
-    pub fn new(rpc_url: &str) -> anyhow::Result<Self> {
+    pub fn new(rpc_url: &str, contract_config: &'static ContractConfig) -> anyhow::Result<Self> {
         Ok(Self {
             storage_bridge: StorageWorker::spawner()
                 .as_module(true)
@@ -100,7 +100,7 @@ impl WebClient {
             prover_bridge: ProverWorker::spawner()
                 .as_module(true)
                 .spawn("./js/prover-worker.js"),
-            fetcher: Rc::new(CoreStateFetcher::new(rpc_url)?),
+            fetcher: Rc::new(CoreStateFetcher::new(rpc_url, contract_config)?),
         })
     }
 
@@ -168,9 +168,10 @@ impl WebClient {
 
     async fn prove_deposit_inner(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
-        amount_stroops: BigInt,
+        amount: BigInt,
         output_amounts: Array,
         on_status: Option<Function>,
     ) -> Result<Option<DepositPrepared>, JsError> {
@@ -184,9 +185,9 @@ impl WebClient {
 
         let membership_blinding = parse_field_bigint_numeric(&membership_blinding)?;
 
-        let amount_stroops = parse_ext_amount_decimal(&amount_stroops)?;
-        if amount_stroops <= ExtAmount::ZERO {
-            return Err(JsError::new("amount_stroops must be > 0 for deposit"));
+        let amount = parse_ext_amount_decimal(&amount)?;
+        if amount <= ExtAmount::ZERO {
+            return Err(JsError::new("amount must be > 0 for deposit"));
         }
 
         emit_progress(
@@ -217,13 +218,21 @@ impl WebClient {
                 None,
                 None,
             );
-            let data = self
+            let ContractsStateData {
+                pools,
+                asp_membership,
+                asp_non_membership,
+            } = self
                 .fetcher
-                .all_contracts_data()
+                .contracts_data_for_pool(&pool_contract_id)
                 .await
                 .map_err(|e| JsError::new(&e.to_string()))?;
 
-            let pool_root = data.pool.merkle_root;
+            let pool = pools
+                .into_iter()
+                .next()
+                .ok_or_else(|| JsError::new("the pool data is not fetched"))?;
+            let pool_root = pool.merkle_root;
 
             emit_progress(
                 &on_status,
@@ -256,7 +265,7 @@ impl WebClient {
                 .fetcher
                 .get_nonmembership_proof(
                     &note_pubkey,
-                    data.asp_non_membership.root,
+                    asp_non_membership.root,
                     SMT_DEPTH as usize,
                     &user_address,
                 )
@@ -266,14 +275,15 @@ impl WebClient {
             let req = DepositRequest {
                 user_address: user_address.clone(),
                 membership_blinding,
-                amount_stroops,
+                amount,
                 pool_root,
-                pool_address: data.pool.contract_id,
-                aspmem_root: data.asp_membership.root,
-                aspmem_ledger: data.asp_membership.ledger,
+                pool_address: pool.contract_id,
+                aspmem_root: asp_membership.root,
+                aspmem_contract_id: asp_membership.contract_id.clone(),
+                aspmem_ledger: asp_membership.ledger,
                 output_amounts: out_amounts,
                 smt_depth: SMT_DEPTH,
-                tree_depth: data.pool.merkle_levels,
+                tree_depth: pool.merkle_levels,
                 non_membership_proof,
             };
 
@@ -343,6 +353,7 @@ impl WebClient {
 
     async fn prove_withdraw_inner(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
         withdraw_recipient: String,
@@ -383,15 +394,23 @@ impl WebClient {
                 None,
                 None,
             );
-            let data = self
+            let ContractsStateData {
+                pools,
+                asp_membership,
+                asp_non_membership,
+            } = self
                 .fetcher
-                .all_contracts_data()
+                .contracts_data_for_pool(&pool_contract_id)
                 .await
                 .map_err(|e| JsError::new(&e.to_string()))?;
 
-            let pool_root = data.pool.merkle_root;
+            let pool = pools
+                .into_iter()
+                .next()
+                .ok_or_else(|| JsError::new("the pool data is not fetched"))?;
+            let pool_root = pool.merkle_root;
             let pool_next_index =
-                parse_u32_decimal(&data.pool.merkle_next_index).map_err(|e| JsError::new(&e))?;
+                parse_u32_decimal(&pool.merkle_next_index).map_err(|e| JsError::new(&e))?;
 
             emit_progress(
                 &on_status,
@@ -424,7 +443,7 @@ impl WebClient {
                 .fetcher
                 .get_nonmembership_proof(
                     &note_pubkey,
-                    data.asp_non_membership.root,
+                    asp_non_membership.root,
                     SMT_DEPTH as usize,
                     &user_address,
                 )
@@ -437,11 +456,13 @@ impl WebClient {
                 withdraw_recipient: withdraw_recipient.clone(),
                 pool_root,
                 pool_next_index,
-                aspmem_root: data.asp_membership.root,
-                aspmem_ledger: data.asp_membership.ledger,
+                pool_address: pool.contract_id.clone(),
+                aspmem_root: asp_membership.root,
+                aspmem_contract_id: asp_membership.contract_id.clone(),
+                aspmem_ledger: asp_membership.ledger,
                 input_commitments: input_commitments.clone(),
                 smt_depth: SMT_DEPTH,
-                tree_depth: data.pool.merkle_levels,
+                tree_depth: pool.merkle_levels,
                 non_membership_proof,
             };
 
@@ -512,6 +533,7 @@ impl WebClient {
     #[allow(clippy::too_many_arguments)]
     async fn prove_transfer_inner(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
         recipient_note_key_hex: String,
@@ -576,15 +598,23 @@ impl WebClient {
                 None,
                 None,
             );
-            let data = self
+            let ContractsStateData {
+                pools,
+                asp_membership,
+                asp_non_membership,
+            } = self
                 .fetcher
-                .all_contracts_data()
+                .contracts_data_for_pool(&pool_contract_id)
                 .await
                 .map_err(|e| JsError::new(&e.to_string()))?;
 
-            let pool_root = data.pool.merkle_root;
+            let pool = pools
+                .into_iter()
+                .next()
+                .ok_or_else(|| JsError::new("the pool data is not fetched"))?;
+            let pool_root = pool.merkle_root;
             let pool_next_index =
-                parse_u32_decimal(&data.pool.merkle_next_index).map_err(|e| JsError::new(&e))?;
+                parse_u32_decimal(&pool.merkle_next_index).map_err(|e| JsError::new(&e))?;
 
             emit_progress(
                 &on_status,
@@ -617,7 +647,7 @@ impl WebClient {
                 .fetcher
                 .get_nonmembership_proof(
                     &note_pubkey,
-                    data.asp_non_membership.root,
+                    asp_non_membership.root,
                     SMT_DEPTH as usize,
                     &user_address,
                 )
@@ -629,15 +659,16 @@ impl WebClient {
                 membership_blinding,
                 pool_root,
                 pool_next_index,
-                pool_address: data.pool.contract_id,
-                aspmem_root: data.asp_membership.root,
-                aspmem_ledger: data.asp_membership.ledger,
+                pool_address: pool.contract_id,
+                aspmem_root: asp_membership.root,
+                aspmem_contract_id: asp_membership.contract_id.clone(),
+                aspmem_ledger: asp_membership.ledger,
                 input_commitments: input_commitments.clone(),
                 output_amounts: out_amounts,
                 recipient_note_pubkey: recipient_note_pubkey.clone(),
                 recipient_encryption_pubkey: recipient_enc_pubkey.clone(),
                 smt_depth: SMT_DEPTH,
-                tree_depth: data.pool.merkle_levels,
+                tree_depth: pool.merkle_levels,
                 non_membership_proof,
             };
 
@@ -708,10 +739,11 @@ impl WebClient {
     #[allow(clippy::too_many_arguments)]
     async fn prove_transact_inner(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
         ext_recipient: String,
-        ext_amount_stroops: BigInt,
+        ext_amount: BigInt,
         input_note_ids: Array,
         output_amounts: Array,
         out_recipient_note_keys_hex: Array,
@@ -740,7 +772,7 @@ impl WebClient {
         }
 
         let membership_blinding = parse_field_bigint_numeric(&membership_blinding)?;
-        let ext_amount = parse_ext_amount_decimal(&ext_amount_stroops)?;
+        let ext_amount = parse_ext_amount_decimal(&ext_amount)?;
 
         emit_progress(
             &on_status,
@@ -809,15 +841,23 @@ impl WebClient {
                 None,
                 None,
             );
-            let data = self
+            let ContractsStateData {
+                pools,
+                asp_membership,
+                asp_non_membership,
+            } = self
                 .fetcher
-                .all_contracts_data()
+                .contracts_data_for_pool(&pool_contract_id)
                 .await
                 .map_err(|e| JsError::new(&e.to_string()))?;
 
-            let pool_root = data.pool.merkle_root;
+            let pool = pools
+                .into_iter()
+                .next()
+                .ok_or_else(|| JsError::new("the pool data is not fetched"))?;
+            let pool_root = pool.merkle_root;
             let pool_next_index =
-                parse_u32_decimal(&data.pool.merkle_next_index).map_err(|e| JsError::new(&e))?;
+                parse_u32_decimal(&pool.merkle_next_index).map_err(|e| JsError::new(&e))?;
 
             emit_progress(
                 &on_status,
@@ -850,7 +890,7 @@ impl WebClient {
                 .fetcher
                 .get_nonmembership_proof(
                     &note_pubkey,
-                    data.asp_non_membership.root,
+                    asp_non_membership.root,
                     SMT_DEPTH as usize,
                     &user_address,
                 )
@@ -862,17 +902,18 @@ impl WebClient {
                 membership_blinding,
                 pool_root,
                 pool_next_index,
-                pool_address: data.pool.contract_id,
+                pool_address: pool.contract_id,
                 ext_recipient: ext_recipient.clone(),
                 ext_amount,
-                aspmem_root: data.asp_membership.root,
-                aspmem_ledger: data.asp_membership.ledger,
+                aspmem_root: asp_membership.root,
+                aspmem_contract_id: asp_membership.contract_id.clone(),
+                aspmem_ledger: asp_membership.ledger,
                 input_commitments: input_commitments.clone(),
                 output_amounts: out_amounts,
                 out_recipient_note_pubkeys: out_note_pks.clone(),
                 out_recipient_encryption_pubkeys: out_enc_pks.clone(),
                 smt_depth: SMT_DEPTH,
-                tree_depth: data.pool.merkle_levels,
+                tree_depth: pool.merkle_levels,
                 non_membership_proof,
             };
 
@@ -943,34 +984,14 @@ impl WebClient {
 
 #[wasm_bindgen]
 impl WebClient {
-    #[wasm_bindgen(js_name = poolContractState)]
-    pub async fn pool_contract_state(&self) -> Result<JsValue, JsError> {
-        let pool_info = self
+    #[wasm_bindgen(js_name = aspState)]
+    pub async fn asp_state(&self) -> Result<JsValue, JsError> {
+        let asp_state = self
             .fetcher
-            .pool_contract_state()
+            .asp_state()
             .await
             .map_err(|e| JsError::new(&e.to_string()))?;
-        Ok(serde_wasm_bindgen::to_value(&pool_info)?)
-    }
-
-    #[wasm_bindgen(js_name = aspMembershipContractState)]
-    pub async fn asp_membership_contract_state(&self) -> Result<JsValue, JsError> {
-        let asp_membership = self
-            .fetcher
-            .asp_membership_contract_state()
-            .await
-            .map_err(|e| JsError::new(&e.to_string()))?;
-        Ok(serde_wasm_bindgen::to_value(&asp_membership)?)
-    }
-
-    #[wasm_bindgen(js_name = aspNonmembershipContractState)]
-    pub async fn asp_nonmembership_contract_state(&self) -> Result<JsValue, JsError> {
-        let asp_nonmembership = self
-            .fetcher
-            .asp_nonmembership_contract_state()
-            .await
-            .map_err(|e| JsError::new(&e.to_string()))?;
-        Ok(serde_wasm_bindgen::to_value(&asp_nonmembership)?)
+        Ok(serde_wasm_bindgen::to_value(&asp_state)?)
     }
 
     #[wasm_bindgen(js_name = allContractsData)]
@@ -1113,17 +1134,19 @@ impl WebClient {
     #[wasm_bindgen(js_name = proveDeposit)]
     pub async fn prove_deposit(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
-        amount_stroops: BigInt,
+        amount: BigInt,
         output_amounts: Array,
         on_status: Option<Function>,
     ) -> Result<JsValue, JsError> {
         let prepared = self
             .prove_deposit_inner(
+                pool_contract_id,
                 user_address,
                 membership_blinding,
-                amount_stroops,
+                amount,
                 output_amounts,
                 on_status,
             )
@@ -1137,6 +1160,7 @@ impl WebClient {
     #[wasm_bindgen(js_name = proveWithdraw)]
     pub async fn prove_withdraw(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
         withdraw_recipient: String,
@@ -1145,6 +1169,7 @@ impl WebClient {
     ) -> Result<JsValue, JsError> {
         let prepared = self
             .prove_withdraw_inner(
+                pool_contract_id,
                 user_address,
                 membership_blinding,
                 withdraw_recipient,
@@ -1162,6 +1187,7 @@ impl WebClient {
     #[allow(clippy::too_many_arguments)]
     pub async fn prove_transfer(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
         recipient_note_key_hex: String,
@@ -1172,6 +1198,7 @@ impl WebClient {
     ) -> Result<JsValue, JsError> {
         let prepared = self
             .prove_transfer_inner(
+                pool_contract_id,
                 user_address,
                 membership_blinding,
                 recipient_note_key_hex,
@@ -1191,10 +1218,11 @@ impl WebClient {
     #[allow(clippy::too_many_arguments)]
     pub async fn prove_transact(
         &self,
+        pool_contract_id: String,
         user_address: String,
         membership_blinding: BigInt,
         ext_recipient: String,
-        ext_amount_stroops: BigInt,
+        ext_amount: BigInt,
         input_note_ids: Array,
         output_amounts: Array,
         out_recipient_note_keys_hex: Array,
@@ -1203,10 +1231,11 @@ impl WebClient {
     ) -> Result<JsValue, JsError> {
         let prepared = self
             .prove_transact_inner(
+                pool_contract_id,
                 user_address,
                 membership_blinding,
                 ext_recipient,
-                ext_amount_stroops,
+                ext_amount,
                 input_note_ids,
                 output_amounts,
                 out_recipient_note_keys_hex,
@@ -1223,7 +1252,7 @@ impl WebClient {
 
 #[async_trait::async_trait(?Send)]
 impl stellar::ContractDataStorage for WebClient {
-    async fn get_sync_state(&self) -> anyhow::Result<Option<types::SyncMetadata>> {
+    async fn get_sync_state(&self) -> anyhow::Result<Vec<types::SyncMetadata>> {
         let mut bridge = self.storage_bridge.fork();
         let resp = with_timeout(5_000, bridge.run(StorageWorkerRequest::SyncState)).await?;
         match resp {
@@ -1236,6 +1265,27 @@ impl stellar::ContractDataStorage for WebClient {
     async fn save_events_batch(&self, data: types::ContractsEventData) -> anyhow::Result<()> {
         let mut bridge = self.storage_bridge.fork();
         let resp = with_timeout(10_000, bridge.run(StorageWorkerRequest::SaveEvents(data))).await?;
+        match resp {
+            StorageWorkerResponse::Saved => Ok(()),
+            StorageWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
+            other => Err(anyhow::anyhow!("unexpected response: {:?}", other)),
+        }
+    }
+
+    async fn save_sync_progress(
+        &self,
+        metadata: Vec<types::SyncMetadata>,
+        fully_indexed: bool,
+    ) -> anyhow::Result<()> {
+        let mut bridge = self.storage_bridge.fork();
+        let resp = with_timeout(
+            10_000,
+            bridge.run(StorageWorkerRequest::SaveSyncProgress(
+                metadata,
+                fully_indexed,
+            )),
+        )
+        .await?;
         match resp {
             StorageWorkerResponse::Saved => Ok(()),
             StorageWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
