@@ -4,9 +4,9 @@ use prover::flows::{N_OUTPUTS, TransactParams};
 pub type Address = String;
 use stellar::PreparedSorobanTx;
 use types::{
-    AspMembershipSync, AspNonMembershipProof, ContractsEventData, ExtAmount, ExtData, Field,
-    KeyDerivationSignature, NoteAmount, NotePublicKey, PoolLedgerActivity, PublicKeyEntry,
-    SyncMetadata, UserNoteSummary,
+    AspMembershipSync, AspNonMembershipProof, ContractsEventData, DisclosureReceipt, ExtAmount,
+    ExtData, Field, KeyDerivationSignature, NoteAmount, NotePrivateKey, NotePublicKey,
+    PoolLedgerActivity, PublicKeyEntry, SyncMetadata, UserNoteSummary,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,6 +61,7 @@ pub enum StorageWorkerRequest {
     },
     RecentPoolActivity(u32),
     RecentPubKeys(u32),
+    DisclosureInputs(DisclosureInputsRequest),
     Transact(TransactRequest),
     DeriveASPleaf(AdminASPRequest),
 }
@@ -79,6 +80,7 @@ pub enum StorageWorkerResponse {
     RecentPoolActivity(Vec<PoolLedgerActivity>),
     PubKeys(Vec<PublicKeyEntry>),
     AspMembershipSync(AspMembershipSync),
+    DisclosureInputs(DisclosureInputs),
     TransactParams(TransactParams),
     DeriveASPleaf(Field),
 }
@@ -88,6 +90,8 @@ pub enum StorageWorkerResponse {
 pub enum ProverWorkerRequest {
     Ping,
     Transact(TransactParams),
+    Disclosure(DisclosureProverRequest),
+    VerifyDisclosureProof(DisclosureReceipt, String),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -96,6 +100,31 @@ pub enum ProverWorkerResponse {
     Pong,
     Error(String),
     TransactPrepared(PreparedProverTx),
+    Disclosure(DisclosureReceipt),
+    DisclosureProofVerified(bool),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisclosureInputsRequest {
+    pub user_address: Address,
+    pub pool_address: Address,
+    pub selected_commitment: Field,
+    pub pool_root: Option<Field>,
+    pub pool_next_index: u32,
+    pub tree_depth: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisclosureInputs {
+    pub root: Field,
+    pub note_commitment: Field,
+    pub note_amount: NoteAmount,
+    pub note_private_key: NotePrivateKey,
+    pub note_blinding: Field,
+    pub merkle_path_indices: Field,
+    pub merkle_path_elements: Vec<Field>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -151,4 +180,16 @@ pub struct PreparedProverTx {
 pub struct AdminASPRequest {
     pub membership_blinding: Field,
     pub pubkey: NotePublicKey,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DisclosureProverRequest {
+    pub inputs: DisclosureInputs,
+    pub network: String,
+    pub pool_address: String,
+    pub authority_label: String,
+    pub authority_identity_payload_hex: String,
+    pub purpose: String,
+    pub context_nonce: Field,
 }

@@ -1,6 +1,6 @@
 use crate::protocol::{
-    AdminASPRequest, AspSecret, DisclaimerStatePayload, PublicEncryptionKeyPair, PublicNoteKeyPair,
-    StorageWorkerRequest, StorageWorkerResponse, UserKeys,
+    AdminASPRequest, AspSecret, DisclaimerStatePayload, DisclosureInputs, PublicEncryptionKeyPair,
+    PublicNoteKeyPair, StorageWorkerRequest, StorageWorkerResponse, UserKeys,
 };
 use anyhow::Result;
 use futures::{channel::mpsc, stream::StreamExt};
@@ -12,7 +12,7 @@ use prover::{
         derive_encryption_and_note_keypairs, derive_membership_blinding, generate_random_blinding,
     },
     flows::{N_OUTPUTS, TransactInputNote, TransactOutput, TransactParams},
-    merkle::{MerklePrefixTree, MerkleProof},
+    merkle::{MerklePrefixTree, MerklePrefixTreeBuilt, MerkleProof},
 };
 use state::{
     AccountKeys, DerivedUserNoteRow, PoolCommitmentRow, Storage, StoredUserKeys, process_events,
@@ -20,7 +20,8 @@ use state::{
 };
 use std::cell::RefCell;
 use types::{
-    AspMembershipProof, AspMembershipSync, EncryptionKeyPair, Field, NoteKeyPair, NotePublicKey,
+    AspMembershipProof, AspMembershipSync, EncryptionKeyPair, Field, NoteAmount, NoteKeyPair,
+    NotePublicKey,
 };
 use wasm_bindgen::JsError;
 use wasm_bindgen_futures::spawn_local;
@@ -306,6 +307,55 @@ pub(crate) async fn router(req: StorageWorkerRequest) -> Result<StorageWorkerRes
             );
             StorageWorkerResponse::PubKeys(list)
         }
+        StorageWorkerRequest::DisclosureInputs(req) => {
+            log::trace!(
+                "[{WORKER_NAME}] build selective disclosure inputs for {}",
+                req.user_address
+            );
+
+            let pool_root = req
+                .pool_root
+                .ok_or_else(|| anyhow::anyhow!("missing pool_root"))?;
+            let (note_privkey, _note_pubkey, _encryption_pubkey, _membership_blinding) =
+                load_user_key_material(&req.user_address)?;
+
+            let tree = match build_validated_pool_tree(
+                &req.pool_address,
+                req.pool_next_index,
+                req.tree_depth,
+                pool_root,
+            )? {
+                Ok(tree) => tree,
+                Err(status) => return Ok(StorageWorkerResponse::AspMembershipSync(status)),
+            };
+
+            let (amount, blinding, leaf_index) = with_storage!(
+                s => s.get_unspent_user_note_by_commitment(&req.pool_address, &req.user_address, &req.selected_commitment)?
+            )?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "unspent note not found for commitment {}",
+                    req.selected_commitment
+                )
+            })?;
+
+            let MerkleProof {
+                path_elements,
+                path_indices,
+                root,
+                ..
+            } = tree.proof(leaf_index)?;
+
+            StorageWorkerResponse::DisclosureInputs(DisclosureInputs {
+                root,
+                note_commitment: req.selected_commitment,
+                note_amount: amount,
+                note_private_key: note_privkey,
+                note_blinding: blinding,
+                merkle_path_indices: path_indices,
+                merkle_path_elements: path_elements,
+            })
+        }
         StorageWorkerRequest::DeriveASPleaf(AdminASPRequest {
             membership_blinding,
             pubkey,
@@ -481,6 +531,38 @@ fn build_pool_inputs(
         return Ok(Ok(Vec::new()));
     }
 
+    let tree = match build_validated_pool_tree(
+        pool_address,
+        pool_next_index,
+        tree_depth,
+        expected_pool_root,
+    )? {
+        Ok(tree) => tree,
+        Err(status) => return Ok(Err(status)),
+    };
+
+    let mut out = Vec::with_capacity(input_commitments.len());
+    for commitment in input_commitments {
+        let Some((amount, blinding, leaf_index)) = with_storage!(s => s.get_unspent_user_note_by_commitment(pool_address, user_address, commitment)?)?
+        else {
+            log::info!(
+                "[{WORKER_NAME}] unspent note not found for commitment {commitment}; waiting for note derivation"
+            );
+            return Ok(Err(AspMembershipSync::SyncRequired(None)));
+        };
+
+        out.push(build_pool_input_note(amount, blinding, leaf_index, &tree)?);
+    }
+
+    Ok(Ok(out))
+}
+
+fn build_validated_pool_tree(
+    pool_address: &str,
+    pool_next_index: u32,
+    tree_depth: u32,
+    expected_pool_root: Field,
+) -> Result<std::result::Result<MerklePrefixTreeBuilt, AspMembershipSync>> {
     let leaves = with_storage!(s => s.get_pool_commitment_leaves_ordered(pool_address)?)?;
 
     if leaves.len() != pool_next_index as usize {
@@ -498,31 +580,27 @@ fn build_pool_inputs(
         anyhow::bail!("pool root mismatch: local computed root does not match on-chain root");
     }
 
-    let mut out = Vec::with_capacity(input_commitments.len());
-    for commitment in input_commitments {
-        let Some((amount, blinding, leaf_index)) = with_storage!(s => s.get_unspent_user_note_by_commitment(pool_address, user_address, commitment)?)?
-        else {
-            log::info!(
-                "[{WORKER_NAME}] unspent note not found for commitment {commitment}; waiting for note derivation"
-            );
-            return Ok(Err(AspMembershipSync::SyncRequired(None)));
-        };
+    Ok(Ok(tree))
+}
 
-        let MerkleProof {
-            path_elements,
-            path_indices,
-            ..
-        } = tree.proof(leaf_index)?;
+fn build_pool_input_note(
+    amount: NoteAmount,
+    blinding: Field,
+    leaf_index: u32,
+    tree: &MerklePrefixTreeBuilt,
+) -> Result<TransactInputNote> {
+    let MerkleProof {
+        path_elements,
+        path_indices,
+        ..
+    } = tree.proof(leaf_index)?;
 
-        out.push(TransactInputNote {
-            amount,
-            blinding,
-            merkle_path_elements: path_elements,
-            merkle_path_indices: path_indices,
-        });
-    }
-
-    Ok(Ok(out))
+    Ok(TransactInputNote {
+        amount,
+        blinding,
+        merkle_path_elements: path_elements,
+        merkle_path_indices: path_indices,
+    })
 }
 
 fn kick_processor() {

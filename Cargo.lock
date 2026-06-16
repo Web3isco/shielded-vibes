@@ -5794,6 +5794,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "console_error_panic_hook",
+ "disclosure",
  "futures",
  "gloo-timers",
  "gloo-worker",
