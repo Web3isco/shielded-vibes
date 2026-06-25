@@ -15,45 +15,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo
-            target
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+      - name: Build static site
+        run: |
+          mkdir -p dist/js dist/css dist/assets
 
-      - name: Install WASM target
-        run: rustup target add wasm32v1-none
+          # Copy assets
+          cp -r app/assets/* dist/assets/ 2>/dev/null || true
 
-      - name: Install Trunk
-        run: cargo install trunk --locked
+          # Copy CSS
+          cp app/css/vibes.css dist/css/vibes.css
 
-      - name: Build ZK circuits
-        run: cargo build -p circuits --release
+          # Copy standalone JS files (files with no npm imports)
+          cp app/js/vibes.js dist/js/vibes.js
 
-      - name: Install npm deps
-        run: npm install --prefix app
+          # Create stub wasm facade (needed so wallet.js errors don't break page)
+          cat > dist/js/web.js << 'WEBEOF'
+          window.__shieldedVibes = window.__shieldedVibes || { wasmReady: false };
+          WEBEOF
 
-      - name: Build frontend with Trunk
-        run: trunk build --release
+          cat > dist/js/wasm-facade.js << 'WASMEOF'
+          export async function initializeWasm() { console.log('[demo] WASM not loaded'); }
+          export const getHandle = () => null;
+          WASMEOF
+
+          # Add tailwind CDN and replace data-trunk tags
+          sed 's|<link data-trunk[^>]*rel="tailwind-css"[^>]*/>|<script src="https://cdn.tailwindcss.com"></script>|' app/index.html > dist/index.html.tmp
+
+          sed -i 's|<link data-trunk[^>]*rel="stylesheet"[^>]*href="css/vibes.css"[^>]*/>|<link href="css/vibes.css" rel="stylesheet">|' dist/index.html.tmp
+
+          # Remove remaining data-trunk lines (Rust WASM, copy-dir etc)
+          sed -i '/data-trunk/d' dist/index.html.tmp
+
+          # Set network name to "Testnet" so vibes.js testnet banner activates
+          sed -i 's|<span id="network-name">Network</span>|<span id="network-name">Testnet Network</span>|' dist/index.html.tmp
+
+          # Remove Google fonts (not needed for demo, avoids external requests)
+          sed -i '/fonts.googleapis.com/d' dist/index.html.tmp
+          sed -i '/fonts.gstatic.com/d' dist/index.html.tmp
+
+          # Inject scripts before closing body tag
+          sed -i 's|</body>|<script type="module" src="js/wasm-facade.js"></script>\n<script src="js/vibes.js"></script>\n</body>|' dist/index.html.tmp
+
+          mv dist/index.html.tmp dist/index.html
+
+          # Copy extra HTML pages
+          cp app/admin.html dist/ 2>/dev/null || true
+          cp app/disclosure.html dist/ 2>/dev/null || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
