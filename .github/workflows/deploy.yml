@@ -14,61 +14,111 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build static site
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-targets: "true"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install npm deps
+        run: npm ci
+        working-directory: app
+
+      - name: Install wasm-bindgen-cli
+        run: cargo install wasm-bindgen-cli --version 0.2.120 --locked
+
+      - name: Build circuit artifacts
+        run: cargo build -p circuits
+
+      - name: Build WASM targets
         run: |
-          mkdir -p dist/js dist/css dist/assets
+          cargo build -p web --target wasm32-unknown-unknown
+          cargo build -p web --target wasm32-unknown-unknown --bin storage-worker
+          cargo build -p web --target wasm32-unknown-unknown --bin prover-worker
 
-          # Copy assets
-          cp -r app/assets/* dist/assets/ 2>/dev/null || true
+      - name: Run wasm-bindgen
+        run: |
+          mkdir -p dist/js
+          wasm-bindgen target/wasm32-unknown-unknown/debug/web.wasm \
+            --out-dir dist/js --out-name web --target web
+          wasm-bindgen target/wasm32-unknown-unknown/debug/storage-worker.wasm \
+            --out-dir dist/js --out-name storage-worker --target web
+          wasm-bindgen target/wasm32-unknown-unknown/debug/prover-worker.wasm \
+            --out-dir dist/js --out-name prover-worker --target web
 
-          # Copy CSS
+      - name: Bundle JS with esbuild
+        run: |
+          ./node_modules/.bin/esbuild js/ui.js \
+            --external:./web.js --bundle --outfile=../dist/js/ui.js --format=esm
+          ./node_modules/.bin/esbuild js/admin.js \
+            --external:./web.js --bundle --outfile=../dist/js/admin.js --format=esm
+          ./node_modules/.bin/esbuild js/disclosure.js \
+            --external:./web.js --bundle --outfile=../dist/js/disclosure.js --format=esm
+        working-directory: app
+
+      - name: Assemble dist
+        run: |
+          mkdir -p dist/css dist/assets dist/circuits
+
+          # Copy circuit artifacts (needed at runtime for proving)
+          cp target/circuits-artifacts/debug/*.r1cs dist/circuits/ 2>/dev/null || true
+          cp target/circuits-artifacts/debug/*.wasm dist/circuits/ 2>/dev/null || true
+
+          # Static files
           cp app/css/vibes.css dist/css/vibes.css
-
-          # Copy standalone JS files (files with no npm imports)
           cp app/js/vibes.js dist/js/vibes.js
-
-          # Create stub wasm facade (needed so wallet.js errors don't break page)
-          cat > dist/js/web.js << 'WEBEOF'
-          window.__shieldedVibes = window.__shieldedVibes || { wasmReady: false };
-          WEBEOF
-
-          cat > dist/js/wasm-facade.js << 'WASMEOF'
-          export async function initializeWasm() { console.log('[demo] WASM not loaded'); }
-          export const getHandle = () => null;
-          WASMEOF
-
-          # Add tailwind CDN and replace data-trunk tags
-          sed 's|<link data-trunk[^>]*rel="tailwind-css"[^>]*/>|<script src="https://cdn.tailwindcss.com"></script>|' app/index.html > dist/index.html.tmp
-
-          sed -i 's|<link data-trunk[^>]*rel="stylesheet"[^>]*href="css/vibes.css"[^>]*/>|<link href="css/vibes.css" rel="stylesheet">|' dist/index.html.tmp
-
-          # Remove remaining data-trunk lines (Rust WASM, copy-dir etc)
-          sed -i '/data-trunk/d' dist/index.html.tmp
-
-          # Set network name to "Testnet" so vibes.js testnet banner activates
-          sed -i 's|<span id="network-name">Network</span>|<span id="network-name">Testnet Network</span>|' dist/index.html.tmp
-
-          # Remove Google fonts (not needed for demo, avoids external requests)
-          sed -i '/fonts.googleapis.com/d' dist/index.html.tmp
-          sed -i '/fonts.gstatic.com/d' dist/index.html.tmp
-
-          # Inject scripts before closing body tag
-          sed -i 's|</body>|<script type="module" src="js/wasm-facade.js"></script>\n<script src="js/vibes.js"></script>\n</body>|' dist/index.html.tmp
-
-          mv dist/index.html.tmp dist/index.html
-
-          # Copy extra HTML pages
+          cp app/js/sw.js dist/sw.js
+          cp -r app/assets/* dist/assets/ 2>/dev/null || true
           cp app/admin.html dist/ 2>/dev/null || true
           cp app/disclosure.html dist/ 2>/dev/null || true
+
+          # Process index.html
+          cp app/index.html dist/index.html
+          # tailwind-css link → CDN script
+          sed -i 's|<link[^>]*rel="tailwind-css"[^>]*/>|<script src="https://cdn.tailwindcss.com"></script>|' dist/index.html
+          # vibes.css data-trunk link → regular link
+          sed -i 's|<link[^>]*rel="stylesheet"[^>]*href="css/vibes.css"[^>]*/>|<link href="css/vibes.css" rel="stylesheet">|' dist/index.html
+          # Remove all rust crate and copy-dir links
+          sed -i '/rel="rust"/d' dist/index.html
+          sed -i '/rel="copy-dir"/d' dist/index.html
+          # Strip data-trunk artifact attributes
+          sed -i 's/ data-target-path="[^"]*"//g' dist/index.html
+          sed -i 's/ data-integrity="[^"]*"//g' dist/index.html
+          sed -i 's/ data-trunk//g' dist/index.html
+          # Network name
+          sed -i 's|<span id="network-name">Network</span>|<span id="network-name">Testnet</span>|' dist/index.html
+
+          # Prevent GitHub from running Jekyll on the site
+          touch dist/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
