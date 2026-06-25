@@ -13,6 +13,7 @@
   <title>Disclosure Receipts</title>
 
   <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/vibes.css" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,10 +21,11 @@
 </head>
 
 <body class="bg-dark-950 text-dark-50 font-sans min-h-screen antialiased">
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 min-h-screen">
-  <header class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl overflow-visible relative z-50" role="banner">
+<canvas id="particle-canvas"></canvas>
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 min-h-screen relative z-10">
+  <header class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 glass rounded-xl overflow-visible relative z-50" role="banner">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg shadow-lg shadow-brand-500/25" aria-hidden="true">
+      <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-brand-500 to-magenta-500 rounded-lg shadow-glow-cyan" aria-hidden="true">
         <svg class="w-6 h-6 text-dark-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 6v12M8 10l4-4 4 4"/>
@@ -62,13 +64,13 @@
   </header>
 
   <!-- Generate Section -->
-  <section id="disclosure-generate" class="bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6" aria-labelledby="generate-heading">
+  <section id="disclosure-generate" class="glass rounded-xl p-4 sm:p-6" aria-labelledby="generate-heading">
     <h2 id="generate-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400 mb-4">Generate Disclosure Receipt</h2>
     <!-- Rendered by disclosure.js -->
   </section>
 
   <!-- Verify Section -->
-  <section id="disclosure-verify" class="bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6" aria-labelledby="verify-heading">
+  <section id="disclosure-verify" class="glass rounded-xl p-4 sm:p-6" aria-labelledby="verify-heading">
     <h2 id="verify-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400 mb-4">Verify Disclosure Receipt</h2>
     <!-- Rendered by disclosure.js -->
   </section>

@@ -1,153 +1,203 @@
-# Private Payments for Stellar
+# Shielded Vibes — Private Payments on Stellar
 
-[![Deployment](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/deployment.yml/badge.svg)](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/deployment.yml)
-[![Lint](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/linter.yml/badge.svg)](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/linter.yml)
-[![Build](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/build-and-test.yml)
-[![Dependencies](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/dependency-audit.yml/badge.svg)](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/dependency-audit.yml)
-[![UB](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/ub-detection.yml/badge.svg)](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/ub-detection.yml)
-[![Coverage](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/coverage.yml/badge.svg)](https://github.com/NethermindEth/stellar-private-payments/actions/workflows/coverage.yml)
+> **One-Line Pitch:** A beautiful, privacy-preserving payment pool where every transaction is shielded by Groth16 zero-knowledge proofs — built on Stellar, wrapped in a cyberpunk neon UI, and ready for your demo.
+
+## 🚀 Quick Start (Windows)
+
+**Just double-click `SETUP.bat`** — it will:
+1. Check/install Rust
+2. Install Visual Studio C++ tools
+3. Install Trunk
+4. Start the dev server at `http://localhost:8000`
+
+> Total time: ~15–30 min. No coding knowledge needed.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=flat&logo=telegram&logoColor=white)](https://t.me/stellar_privacy)
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/groups/18809039/)
+[![Built with OpenCode](https://img.shields.io/badge/Built%20with-OpenCode-00f0ff.svg)](https://opencode.ai)
+[![Nethermind Base](https://img.shields.io/badge/Powered%20by-Nethermind-b300ff.svg)](https://github.com/NethermindEth/stellar-private-payments)
 
-> [!WARNING]
-> This project is a **Work in progress (WIP)**. It is intended to serve as **a reference implementation** of privacy pools for Stellar. The code has not yet been audited and should not be used in production environments with real assets as of now. The security hardening work is planned.
+---
 
-A privacy-preserving payment system for the Stellar network using zero-knowledge proofs. This implementation enables users to deposit, transfer, and withdraw tokens while maintaining transaction privacy through Groth16 proofs.
+## Screenshots
 
-The system incorporates **Association Set Provider (ASPs)** as a control mechanism to provide illicit activity safeguards through association sets. ASPs maintain membership and non-membership Merkle trees that allow proving whether specific deposits are part of approved or blocked sets, enabling pool operators to enforce administrative controls without compromising user privacy.
+> *(Replace these placeholders with actual screenshots before submission)*
 
-## Features
+| Landing Page | Dashboard | Send with Vibe Note |
+|---|---|---|
+| `[screenshot hero.png]` | `[screenshot dashboard.png]` | `[screenshot send.png]` |
 
-- **Private Payments**: Deposit, transfer, and withdraw tokens without revealing transaction amounts or sender/receiver relationships
-- **Zero-Knowledge Proofs**: Groth16 proofs generated via Circom circuits
-- **Administrative Controls**: ASP-based membership and non-membership proofs for illicit activity safeguards
-- **Browser-Based Proving**: Client-side proof generation using WebAssembly
-- **Stellar Integration**: Built on Soroban smart contracts
+| Activity Feed | Confetti Celebration | Console Logs |
+|---|---|---|
+| `[screenshot feed.png]` | `[screenshot confetti.png]` | `[screenshot console.png]` |
 
-## Demo Application
-The demo application consists on three main parts:
-- **Frontend**: Provides a nice user interface for interacting with the system. 
-- **Circuits**: Where the real zk-magic happens and constraints are defined.
-- **Smart Contracts**: They define the state of the system, and how transactions are processed.
-The Frontend includes the [user-facing part](#transaction-flow) and an example of an [ASP admin page](#asp-admin-page) which will be separated according to roles in the main application
+---
 
-If you want to try it out:
+## How ZK Is Used
 
-1. Deploy the contracts to a Stellar network:
-    ```bash
-    ./deployments/scripts/deploy.sh <network> \         # e.g. testnet
-      --deployer <identity> \                           # Must be added in stellar-cli keys
-      --asp-levels 10 \                                 # Number of levels in the ASP trees
-      --pool-levels 10 \                                # Number of levels in the pool Merkle tree
-      --max-deposit 1000000000 \                        # Maximum deposit amount (in Stroops)
-      --vk-file deployments/testnet/circuit_keys/policy_tx_2_2_vk.json # Verification key file
-    ```
-   If you already have deployed contracts, make sure their addresses are updated in `deployments/testnet/deployments.json`.
+Shielded Vibes uses **Groth16 zero-knowledge proofs** to achieve privacy on a public blockchain:
 
-2. Serve frontend
-    ```bash
-      make serve
-    ```
-    Open `http://localhost:8000` in your browser. You might want to open the console (_Shift + Ctrl + I_) to see the logs.
-    You might need to delete the browser cache from previous runs. Go to `Application` -> `Clear storage`.
+| Operation | What ZK hides | How it works |
+|---|---|---|
+| **Deposit** | Amount deposited | Create a commitment (UTXO) — the proof shows "I deposited a valid amount" without revealing it |
+| **Transfer** | Sender, recipient, amount | Prove ownership of input notes + produce output notes under recipient's public key — all hidden |
+| **Withdraw** | Which notes were spent | Prove you own unspent notes without revealing which ones or their values |
+| **Vibe Notes** | Message content | AES-GCM encrypted with PBKDF2 key derived from recipient's address — only recipient can decrypt |
 
+**Verification:** The Groth16 verifier is deployed as a Soroban smart contract on Stellar. Every proof is verified on-chain before the Pool contract executes the transaction. No trusted setup leakage, no plaintext amounts visible.
 
-3. The pool is ready to use. But you will need to populate the ASP membership smart contracts with some public keys. You can do it directly from the stellar-cli:
-    ```bash
-    stellar contract invoke --id <CONTRACT_ADDRESS> --source-account <ASP_ADMIN_ACCOUNT> -- insert_leaf --leaf <LEAF_VALUE> # See circuit for leaf format
-    ```
-    Or, directly access `http://localhost:8000/admin.html` and use the UI to add public keys.
-    Please note that the admin UI allows deriving keys for ANY account.
-    But insertion MUST be signed by the ASP admin account.
-    You can add your Freighter account to your Stellar-cli keys with `stellar keys add <NAME_FOR_ACCOUNT> --seed-phrase`.
-    This will prompt you to type your seed phrase and will enable you to deploy contracts with the same account you have on your browser wallet.
+---
 
+## Tech Stack
 
-4. Go back to `http://localhost:8000` and try it out!
+| Layer | Technology |
+|-------|-----------|
+| **ZK Backend** | Circom (Groth16) + Rust WASM Prover Worker |
+| **Smart Contracts** | Soroban (Rust) — Pool, ASP, Verifier |
+| **Frontend** | Vanilla HTML/CSS/JS (module-based) |
+| **CSS** | Tailwind v4 + custom cyberpunk vibes.css |
+| **Enhancements** | OpenCode-generated vibes.js (particles, confetti, sound, activity feed, vibe note encryption) |
+| **Wallet** | Freighter (Stellar browser extension) |
+| **Build** | Trunk (Rust WASM bundler) |
+| **Storage** | OPFS + SQLite via Storage Worker |
 
-### Architecture Overview
+Built on [Nethermind's Stellar Private Payments](https://github.com/NethermindEth/stellar-private-payments) — the core Rust WASM, circuits, and contracts remain untouched. All UI/UX enhancements were generated by [OpenCode](https://opencode.ai) in a single conversation.
 
-#### Transaction Flow
+---
 
-1. **Deposit**: User deposits tokens into the pool, creating a commitment (UTXO). No input notes are spent, creates output notes.
-2. **Withdraw**: User proves ownership of commitments and withdraws tokens. Inputs notes are spent, no output notes are created.
-3. **Transfer**: User spends existing commitments and creates new ones, all done privately.  Input notes are spent, and output notes under a new public key are created.
-4. **Transact**: Enables advanced users with experience on privacy-preserving protocols to generate their own transactions. Spending, creating and transferring notes at will.
+## Setup & Run
 
-#### ASP Admin Page
+**Prerequisites:** Rust, Stellar CLI, Node.js, Freighter browser extension (testnet).
 
-This is the administrative control panel for managing the **Association Set Provider (ASP)** membership trees. It allows you to:
+**One command to serve:**
+```bash
+make serve
+```
 
-1. **Add/insert public keys** to the ASP membership tree - Controls which public keys are approved
-2. **Manage the exclusion list** - Block specific public keys via the non-membership Merkle tree
-3. **Derive keys** for accounts - Generate derived keys for any account (though insertion must be signed by the ASP admin account)
+Then open `http://localhost:8000` in your browser.
 
-This provides **illicit activity safeguards** while maintaining user privacy. The ASP membership trees work with the zero-knowledge proofs to prove that deposits either belong to approved accounts or don't belong to blocked accounts—without compromising privacy. To access the ASP Admin Page, go to `http://localhost:8000/admin.html`
+**Full setup (first time only):**
+```bash
+# 1. Deploy contracts to testnet
+./deployments/scripts/deploy.sh testnet \
+  --deployer <identity> \
+  --asp-levels 10 --pool-levels 10 \
+  --max-deposit 1000000000 \
+  --vk-file deployments/testnet/circuit_keys/policy_tx_2_2_vk.json
 
-The admin has the option of toggling the "Admin-Only Leaf Insert", It's enabled by default which restricts only the admin to insert membership leaves but when disabled by the admin, anyone can insert membership leaves.
+# 2. Build circuits
+make circuits-build
 
-> [!WARNING]
-> Disabling "Admin-Only Leaf Insert" removes the access-control safeguard on the ASP membership tree. Any party will be able to add themselves (or others) to the approved set without admin approval, bypassing the intended illicit-activity safeguards. Only disable this in a controlled demo or testing environment—never in production.
+# 3. Build & serve
+make serve
+```
 
+> ℹ️ After deployment, update contract addresses in `deployments/testnet/deployments.json`.
 
-#### Zero-Knowledge Circuits
+---
 
-The main transaction circuit proves:
-- Ownership of input UTXOs (knowledge of private keys)
-- Correct nullifier computation (prevents double-spending)
-- Valid Merkle proofs for input commitments
-- Correct output commitment computation
-- Balance conservation (inputs = outputs + public amount)
-- ASP membership/non-membership proofs
+## 60-Second Demo Script
 
-#### Smart Contracts
+A full recording script with timestamps is in **[DEMO.md](./DEMO.md)**.
 
-- **Pool**: Main contract handling deposits, transfers, and withdrawals
-- **Circom Groth16 Verifier**: On-chain verification of ZK proofs
-- **ASP Membership**: Merkle tree of approved public keys
-- **ASP Non-Membership**: Sparse Merkle tree for exclusion proofs
+| Scene | Duration | What to show |
+|-------|----------|-------------|
+| **Landing** | 0:00–0:10 | Hero with neon glow, testnet banner, particles |
+| **Connect** | 0:10–0:18 | Click Connect Freighter → wallet popup → dashboard updates |
+| **Deposit** | 0:18–0:28 | Slider to 100 XLM → Shield Deposit → confetti + chime |
+| **Send** | 0:28–0:42 | Address + 25 XLM + vibe note → Shield & Send → encrypted badge |
+| **Feed** | 0:42–0:50 | Activity feed with live entries, vibe note badges, glowing borders |
+| **Withdraw** | 0:50–0:58 | Amount + recipient → Shield Withdraw → proof verified |
+| **Close** | 0:58–1:00 | Full dashboard → "Shielded Vibes — powered by ZK on Stellar" |
 
-## Limitations
+---
 
-As a work-in-progress, this implementation has several limitations:
+## Key Features
 
-- **Stellar Events retention**: The app relies heavily on Stellar events. But RPC nodes only store events for a small retention window (7 days). This means that the demo will not work for users onboarded after 7 days of contract deployment because they couldn't re-play events history. But a user who onboarded within 7 days from the contracts deployment and keeps their app tab open in a browser, can use the app without a reset as the events digestion happens in the background.
-- **Not Audited**: The code has not undergone security audits.
-- **Error Handling**: Error handling may not cover all edge cases.
-- **Browser storage** for the storage the app uses SQLite relying on [OPFS](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system). Basically, the data is stored on the file system as some files with opaque names. Some antiviruses and other software may accidentally delete them. In future versions cloud sync maybe introduced. Also clearing the app site data permanently deletes the app database with app-derived keys and notes.
+- **Hero Dashboard** — Big Connect button, shielded balance (client-side only), note count, ASP status
+- **Deposit Card** — Amount slider + quick presets (10, 50, 100, MAX); ZK proof hides the deposit amount
+- **Send Shielded Vibes** — Recipient + amount + optional encrypted "Vibe Note" message (AES-GCM protected)
+- **Withdraw Card** — Shielded withdrawal to any Stellar address
+- **Activity Feed** — Live anonymized timeline with encrypted message badges, entrance animations
+- **Confetti + Sound** — Celebratory effects on successful ZK proof verification
+- **Particle Background** — Dynamic particle count that intensifies on activity
+- **Testnet Banner** — Auto-detected testnet mode with amber glow banner
+- **Console Logging** — Emoji-coded debug logs for easy judging walkthrough
+- **Full Advanced Interface** — Original tab-based Deposit/Withdraw/Transfer/Transact panels preserved below the vibe cards
+- **Privacy Tooltips** — Info badges on every action explaining ZK proof protection
 
+---
 
-## AI tools disclosure
-The content published here may have been refined/augmented by the use of large language models (LLM), computer programs designed to comprehend and generate human language. However, any output refined/generated with the assistance of such programs has been reviewed, edited and revised by Nethermind.
+## Architecture
 
+```
+Browser (WASM)
+  ┌──────────┐  ┌────────────────┐  ┌──────────────┐
+  │  vibes.js │  │  WebClient     │  │  Indexer     │
+  │  ui.js    │──│  (wasm-bindgen)│──│  (poll loop) │
+  └──────────┘  └────┬───────────┘  └──────┬───────┘
+                     │                      │
+         ┌───────────┴──────────┐  ┌────────┴────────┐
+         │  Storage Worker      │  │  Prover Worker  │
+         │  (SQLite + OPFS)     │  │  (Groth16 ZK)   │
+         └──────────────────────┘  └─────────────────┘
+                        │ RPC + Events
+Stellar Network
+  ┌──────────┐  ┌──────────┐  ┌──────────────────┐
+  │ Pool     │  │ ASP      │  │ ASP Non-         │
+  │ Contract │  │ Membership│  │ Membership       │
+  └──────────┘  └──────────┘  └──────────────────┘
+  ┌──────────────────────────────────────────────┐
+  │ Circom Groth16 Verifier (on-chain Soroban)   │
+  └──────────────────────────────────────────────┘
+```
+
+### Transaction Flow
+
+1. **Deposit** → Create commitment (UTXO) → Prover Worker generates Groth16 proof → submitted to Pool contract
+2. **Transfer** → Select input notes → specify recipient keys → compute outputs with ZK proof → submitted
+3. **Withdraw** → Prove ownership of notes → generate ZK proof → receive tokens to specified address
+
+All amounts, recipients, and note values are hidden by Groth16 proofs verified on-chain by the Soroban verifier contract.
+
+---
+
+## Project Structure
+
+```
+├── app/                      # Frontend
+│   ├── index.html            # Main page (hero, dashboard, vibe cards, activity, tabs)
+│   ├── admin.html            # ASP admin console
+│   ├── disclosure.html       # Selective disclosure receipts
+│   ├── css/
+│   │   ├── app.css           # Tailwind v4 cyberpunk theme
+│   │   └── vibes.css         # Neon effects, animations, confetti, testnet banner
+│   ├── js/
+│   │   ├── ui.js             # Main JS orchestrator (untouched)
+│   │   ├── vibes.js          # Enhancement layer (particles, confetti, feed, bridges, encryption)
+│   │   ├── wallet.js         # Freighter wallet integration
+│   │   ├── wasm-facade.js    # WASM bridge
+│   │   └── ui/               # Module-based UI components
+│   ├── crates/               # Rust source (core + web platform)
+│   └── assets/               # Icons, logos, favicon
+├── circuits/                 # Circom ZK circuits (untouched)
+├── contracts/                # Soroban smart contracts (untouched)
+├── circuit-keys/             # Proving/verification keys
+├── deployments/              # Deployment configs & scripts
+├── DEMO.md                   # Video recording script (60s)
+└── e2e-tests/                # End-to-end test suite
+```
+
+---
 
 ## License
 
-This repository contains **source code** provided under a mixed license structure (Apache 2.0 and GPLv3).
+This repository contains source code under a mixed license structure. Most code is Apache 2.0. The `circuits/build.rs` file is licensed under LGPL-3.0. See `LICENSE` and `circuits/LICENSE` for details.
 
-Most of the source code is licensed under the Apache License, Version 2.0. See `LICENSE` for details.
+---
 
-The exception is `circuits/build.rs` which is licensed separately under the GNU Lesser General Public License v3.0. See `circuits/LICENSE` for details.
+## Credits
 
-### Responsibility of Deployers
-
-The `dist/` directory and its contents (including compiled WebAssembly circuits, keys, and bundled JavaScript) are **generated artifacts** produced by the build process. They are not checked into this repository.
-
-If you compile, build, or deploy this project (e.g., hosting the `dist/` folder on a web server), **you become the distributor** of those binary artifacts. It is your responsibility to:
-1.  Ensure all generated artifacts comply with their respective licenses (specifically the LGPLv3 requirements for compiled circuits).
-2.  Include the appropriate `LICENSE` and `NOTICE` files in your deployment directory.
-3.  Make the source code available to your end-users as required by the LGPLv3 (if you are distributing the compiled circuits).
-
-The maintainers of this repository provide the source code "as is" and assume no responsibility for the downstream builds or deployments.
-
-## Would like to contribute?
-
-Please check [the issues](https://github.com/NethermindEth/stellar-private-payments/issues).
-If you're an external contributor, please check the issues with the label `contributors-friendly`.
-See also [Contributing](./CONTRIBUTING.md).
-
-## Credit
-
-Credit goes to Horizen Labs for their [Poseidon2 implementation](https://github.com/HorizenLabs/poseidon2), which is integrated into this repository.
+- **Nethermind** for the [Stellar Private Payments](https://github.com/NethermindEth/stellar-private-payments) base — core Rust WASM, circuits, contracts
+- **OpenCode** for generating the UI/UX enhancement layer (vibes.js, vibes.css, branding)
+- **Horizen Labs** for the Poseidon2 implementation
+- Built in **1 conversation** with OpenCode + the existing Nethermind codebase

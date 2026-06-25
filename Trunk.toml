@@ -69,4 +69,7 @@ command_arguments = ["-c", """
 
 # Service worker must be served from the root (not bundled with ui.js) so it has full-page scope
 cp app/js/sw.js "$TRUNK_STAGING_DIR/sw.js"
+
+# Copy vibes.js enhancement layer (no npm imports needed)
+cp app/js/vibes.js "$TRUNK_STAGING_DIR/js/vibes.js"
 """]

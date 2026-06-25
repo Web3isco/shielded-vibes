@@ -13,6 +13,7 @@
   <title>ASP Admin Console</title>
 
   <link rel="stylesheet" href="css/app.css" />
+  <link rel="stylesheet" href="css/vibes.css" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,10 +21,11 @@
 </head>
 
 <body class="bg-dark-950 text-dark-50 font-sans min-h-screen antialiased">
-<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 min-h-screen">
-  <header class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl overflow-visible relative z-50" role="banner">
+<canvas id="particle-canvas"></canvas>
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 min-h-screen relative z-10">
+  <header class="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 glass rounded-xl overflow-visible relative z-50" role="banner">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-brand-500 to-brand-600 rounded-lg shadow-lg shadow-brand-500/25" aria-hidden="true">
+      <div class="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-brand-500 to-magenta-500 rounded-lg shadow-glow-cyan" aria-hidden="true">
         <svg class="w-6 h-6 text-dark-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <path d="M12 6v12M8 10l4-4 4 4"/>
@@ -61,7 +63,7 @@
     </div>
   </header>
 
-  <section class="bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6" aria-labelledby="handoff-heading">
+  <section class="glass rounded-xl p-4 sm:p-6" aria-labelledby="handoff-heading">
     <div class="space-y-2">
       <h2 id="handoff-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400">User Handoff</h2>
       <p class="text-xs text-dark-400">
@@ -71,7 +73,7 @@
   </section>
 
   <main id="main-content" class="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-    <section class="bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6 space-y-4" aria-labelledby="state-heading">
+    <section class="glass rounded-xl p-4 sm:p-6 space-y-4" aria-labelledby="state-heading">
       <div class="flex items-center justify-between gap-2">
         <h2 id="state-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400">Contracts and State</h2>
         <div id="status" class="px-3 py-1.5 text-xs font-mono rounded-lg border border-dark-700 bg-dark-800 text-dark-300">Idle</div>
@@ -135,7 +137,7 @@
       </div>
     </section>
 
-    <section class="bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6 space-y-4" aria-labelledby="membership-heading">
+    <section class="glass rounded-xl p-4 sm:p-6 space-y-4" aria-labelledby="membership-heading">
       <div class="flex items-center justify-between gap-2">
         <h2 id="membership-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400">Membership Leaf Builder</h2>
       </div>
@@ -171,13 +173,13 @@
         <label class="block text-xs font-medium text-dark-400 uppercase tracking-wide" for="membershipLeafInput">Leaf to Insert</label>
         <input class="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-xs font-mono focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" id="membershipLeafInput" type="text" placeholder="Paste leaf hex or decimal" />
       </div>
-      <button class="w-full px-4 py-2 bg-brand-500 text-dark-950 rounded-lg text-sm font-semibold shadow-lg shadow-brand-500/20 hover:bg-brand-400 transition" id="insertMembershipLeafBtn" type="button">
+      <button class="w-full px-4 py-2 btn-neon-cyan rounded-lg text-sm" id="insertMembershipLeafBtn" type="button">
         Insert Membership Leaf
       </button>
       <p class="text-xs text-dark-400">Leaf = Poseidon2(note public key, ASP secret, domain=1).</p>
     </section>
 
-    <section class="bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6 space-y-4" aria-labelledby="nonmembership-heading">
+    <section class="glass rounded-xl p-4 sm:p-6 space-y-4" aria-labelledby="nonmembership-heading">
       <div class="flex items-center justify-between gap-2">
         <h2 id="nonmembership-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400">Non-Membership Insert</h2>
       </div>
@@ -200,7 +202,7 @@
         <div class="text-xs font-medium text-dark-400 uppercase tracking-wide">Computed Leaf Hash (hex)</div>
         <div class="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg font-mono text-xs text-dark-200 break-all" id="computedNonMembershipLeafHex">--</div>
       </div>
-      <button class="w-full px-4 py-2 bg-brand-500 text-dark-950 rounded-lg text-sm font-semibold shadow-lg shadow-brand-500/20 hover:bg-brand-400 transition" id="insertNonMembershipLeafBtn" type="button">
+      <button class="w-full px-4 py-2 btn-neon-cyan rounded-lg text-sm" id="insertNonMembershipLeafBtn" type="button">
         Insert Non-Membership Leaf
       </button>
       <p class="text-xs text-dark-400">Leaf hash uses Poseidon2(key, value, domain=1).</p>
@@ -212,13 +214,13 @@
           <label class="block text-xs font-medium text-dark-400 uppercase tracking-wide" for="removeNonMembershipKey">Key (public key to unblock)</label>
           <input class="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-xs font-mono focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500" id="removeNonMembershipKey" type="text" placeholder="0x..." />
         </div>
-        <button class="w-full px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-semibold shadow-lg shadow-rose-600/20 hover:bg-rose-500 transition" id="removeNonMembershipLeafBtn" type="button">
+        <button class="w-full px-4 py-2 btn-neon-pink rounded-lg text-sm" id="removeNonMembershipLeafBtn" type="button">
           Remove Non-Membership Leaf
         </button>
       </div>
     </section>
 
-    <section class="xl:col-span-3 bg-dark-900/80 backdrop-blur-sm border border-dark-800 rounded-xl p-4 sm:p-6" aria-labelledby="activity-heading">
+    <section class="xl:col-span-3 glass rounded-xl p-4 sm:p-6" aria-labelledby="activity-heading">
       <div class="flex items-center justify-between gap-2 mb-3">
         <h2 id="activity-heading" class="text-sm uppercase tracking-[0.25em] text-brand-400">Activity</h2>
       </div>
