@@ -18,6 +18,12 @@
 
 ---
 
+## Live Demo
+
+🌐 **https://web3isco.github.io/shielded-vibes/**
+
+> Deploys automatically on every push to `main` via GitHub Actions (build + GitHub Pages).
+
 ## Screenshots
 
 > *(Replace these placeholders with actual screenshots before submission)*

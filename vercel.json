@@ -1,6 +1,0 @@
-{
-  "buildCommand": "bash scripts/vercel-build.sh",
-  "outputDirectory": "dist",
-  "framework": null,
-  "installCommand": "npm install --prefix app"
-}
