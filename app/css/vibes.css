@@ -23,7 +23,7 @@
   left: -25%;
   width: 150%;
   height: 200%;
-  background: radial-gradient(ellipse at center, rgba(0, 240, 255, 0.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse at center, rgba(250, 204, 21, 0.08) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -33,10 +33,10 @@
 /* Neon pulse glow */
 @keyframes neon-pulse {
   0%, 100% {
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3), 0 0 30px rgba(0, 240, 255, 0.1);
+    box-shadow: 0 0 10px rgba(250, 204, 21, 0.3), 0 0 30px rgba(250, 204, 21, 0.1);
   }
   50% {
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.6), 0 0 60px rgba(0, 240, 255, 0.2);
+    box-shadow: 0 0 20px rgba(250, 204, 21, 0.6), 0 0 60px rgba(250, 204, 21, 0.2);
   }
 }
 .animate-neon-pulse {
@@ -76,9 +76,9 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(0, 240, 255, 0.06) 25%,
-    rgba(255, 0, 122, 0.06) 50%,
-    rgba(0, 240, 255, 0.06) 75%,
+    rgba(250, 204, 21, 0.06) 25%,
+    rgba(253, 224, 71, 0.06) 50%,
+    rgba(250, 204, 21, 0.06) 75%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -87,8 +87,8 @@
 
 /* Soft breathing glow for cards */
 @keyframes breathe-glow {
-  0%, 100% { border-color: rgba(0, 240, 255, 0.08); }
-  50% { border-color: rgba(0, 240, 255, 0.2); }
+  0%, 100% { border-color: rgba(250, 204, 21, 0.08); }
+  50% { border-color: rgba(250, 204, 21, 0.2); }
 }
 .animate-breathe-glow {
   animation: breathe-glow 4s ease-in-out infinite;
@@ -126,7 +126,7 @@
 .activity-entry {
   position: relative;
   padding-left: 1.5rem;
-  border-left: 2px solid rgba(0, 240, 255, 0.15);
+  border-left: 2px solid rgba(250, 204, 21, 0.15);
   transition: all 0.3s ease;
 }
 .activity-entry::before {
@@ -137,11 +137,11 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #00f0ff;
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
+  background: #facc15;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.6);
 }
 .activity-entry:hover {
-  border-left-color: rgba(0, 240, 255, 0.5);
+  border-left-color: rgba(250, 204, 21, 0.5);
   padding-left: 1.75rem;
 }
 
@@ -153,16 +153,16 @@
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
   font-size: 0.7rem;
-  background: rgba(255, 0, 122, 0.12);
-  color: #ff5aa2;
-  border: 1px solid rgba(255, 0, 122, 0.2);
+  background: rgba(253, 224, 71, 0.12);
+  color: #fef9c3;
+  border: 1px solid rgba(253, 224, 71, 0.2);
 }
 
 /* ─── Dashboard Shielded Balance ─── */
 .balance-glow {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.08), rgba(179, 0, 255, 0.08));
-  border: 1px solid rgba(0, 240, 255, 0.15);
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.05);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.08), rgba(234, 179, 8, 0.08));
+  border: 1px solid rgba(250, 204, 21, 0.15);
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.05);
 }
 
 /* ─── Quick amount buttons ─── */
@@ -171,22 +171,22 @@
   border-radius: 0.5rem;
   font-size: 0.8rem;
   font-weight: 500;
-  background: rgba(0, 240, 255, 0.06);
-  color: rgba(0, 240, 255, 0.7);
-  border: 1px solid rgba(0, 240, 255, 0.12);
+  background: rgba(250, 204, 21, 0.06);
+  color: rgba(250, 204, 21, 0.7);
+  border: 1px solid rgba(250, 204, 21, 0.12);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .quick-amount:hover {
-  background: rgba(0, 240, 255, 0.15);
-  color: #00f0ff;
-  border-color: rgba(0, 240, 255, 0.3);
-  box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+  background: rgba(250, 204, 21, 0.15);
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.3);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.15);
 }
 .quick-amount.active {
-  background: rgba(0, 240, 255, 0.2);
-  color: #00f0ff;
-  border-color: rgba(0, 240, 255, 0.4);
+  background: rgba(250, 204, 21, 0.2);
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.4);
 }
 
 /* ─── Testnet Banner ─── */
@@ -199,16 +199,16 @@
   margin-bottom: 1rem;
   border-radius: 0.75rem;
   font-size: 0.8rem;
-  background: linear-gradient(135deg, rgba(255, 200, 0, 0.08), rgba(255, 150, 0, 0.05));
-  border: 1px solid rgba(255, 200, 0, 0.2);
-  color: #fbbf24;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.08), rgba(234, 179, 8, 0.05));
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  color: #facc15;
   animation: testnet-glow 3s ease-in-out infinite;
   cursor: help;
 }
 
 @keyframes testnet-glow {
-  0%, 100% { border-color: rgba(255, 200, 0, 0.15); box-shadow: 0 0 8px rgba(255, 200, 0, 0.05); }
-  50% { border-color: rgba(255, 200, 0, 0.35); box-shadow: 0 0 20px rgba(255, 200, 0, 0.1); }
+  0%, 100% { border-color: rgba(250, 204, 21, 0.15); box-shadow: 0 0 8px rgba(250, 204, 21, 0.05); }
+  50% { border-color: rgba(250, 204, 21, 0.35); box-shadow: 0 0 20px rgba(250, 204, 21, 0.1); }
 }
 
 /* ─── Privacy Badge in Footer ─── */
@@ -280,7 +280,7 @@
   50% { opacity: 0.8; }
 }
 .skeleton {
-  background: linear-gradient(90deg, rgba(0, 240, 255, 0.04) 25%, rgba(179, 0, 255, 0.06) 50%, rgba(0, 240, 255, 0.04) 75%);
+  background: linear-gradient(90deg, rgba(250, 204, 21, 0.04) 25%, rgba(234, 179, 8, 0.06) 50%, rgba(250, 204, 21, 0.04) 75%);
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
   border-radius: 0.375rem;
@@ -288,10 +288,10 @@
 
 /* ─── Success toast with neon ─── */
 .toast-success {
-  border-color: rgba(0, 240, 255, 0.4) !important;
-  background: rgba(0, 240, 255, 0.06) !important;
+  border-color: rgba(250, 204, 21, 0.4) !important;
+  background: rgba(250, 204, 21, 0.06) !important;
 }
 .toast-error {
-  border-color: rgba(255, 0, 122, 0.4) !important;
-  background: rgba(255, 0, 122, 0.06) !important;
+  border-color: rgba(253, 224, 71, 0.4) !important;
+  background: rgba(253, 224, 71, 0.06) !important;
 }

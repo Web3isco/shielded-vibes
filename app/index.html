@@ -20,6 +20,38 @@
 
     <title>Shielded Vibes — Private Payments on Stellar</title>
 
+    <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a',
+              300: '#fcd34d', 400: '#facc15', 500: '#eab308',
+              600: '#ca8a04', 700: '#a16207', 800: '#854d0e', 900: '#713f12'
+            },
+            dark: {
+              50: '#f5f5f5', 100: '#e5e5e5', 200: '#d4d4d4',
+              300: '#a3a3a3', 400: '#737373', 500: '#525252',
+              600: '#404040', 700: '#262626', 800: '#171717',
+              900: '#0a0a0a', 950: '#000000'
+            },
+            magenta: {
+              300: '#facc15', 400: '#eab308', 500: '#ca8a04'
+            },
+            pink: {
+              300: '#fde047', 400: '#facc15', 500: '#eab308'
+            }
+          },
+          fontFamily: {
+            sans: ['Outfit', 'ui-sans-serif', 'system-ui'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+    </script>
+
     <link data-trunk data-target-path="css" rel="tailwind-css" href="css/app.css" />
     <link data-trunk data-target-path="css" rel="stylesheet" href="css/vibes.css" />
 
@@ -211,7 +243,7 @@
                     <label class="text-xs text-dark-400 uppercase tracking-wider block mb-2">Amount</label>
                     <input type="range" id="vibe-deposit-slider" min="0" max="500" value="0" step="1"
                            class="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                           style="background: linear-gradient(to right, rgba(0,240,255,0.2) 0%, rgba(0,240,255,0.2) var(--slider-pct, 0%), rgba(255,255,255,0.06) var(--slider-pct, 0%), rgba(255,255,255,0.06) 100%);">
+                           style="background: linear-gradient(to right, rgba(250,204,21,0.2) 0%, rgba(250,204,21,0.2) var(--slider-pct, 0%), rgba(255,255,255,0.06) var(--slider-pct, 0%), rgba(255,255,255,0.06) 100%);">
                     <div class="flex items-center justify-between mt-2">
                         <div class="flex gap-1.5">
                             <button type="button" class="quick-amount" data-amount="10">10</button>
@@ -618,7 +650,7 @@
                             <div class="flex items-center gap-4">
                                 <input type="range" id="transact-slider" min="-500" max="500" value="0" step="1"
                                        class="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-                                       style="background: linear-gradient(to right, #ff007a 0%, rgba(255,255,255,0.06) 50%, #00f0ff 100%);"
+                                       style="background: linear-gradient(to right, #facc15 0%, rgba(255,255,255,0.06) 50%, #eab308 100%);"
                                        aria-label="Public amount slider">
                                 <div class="flex items-center gap-2">
                                     <div class="relative">
