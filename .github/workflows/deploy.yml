@@ -65,6 +65,9 @@ jobs:
           cargo build -p web --target wasm32-unknown-unknown --bin storage-worker
           cargo build -p web --target wasm32-unknown-unknown --bin prover-worker
 
+      - name: Install wasm-opt (binaryen)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
       - name: Run wasm-bindgen
         run: |
           mkdir -p dist/js
@@ -74,6 +77,13 @@ jobs:
             --out-dir dist/js --out-name storage-worker --target web
           wasm-bindgen target/wasm32-unknown-unknown/debug/prover-worker.wasm \
             --out-dir dist/js --out-name prover-worker --target web
+
+      - name: Optimize WASM binaries
+        run: |
+          wasm-opt -Oz dist/js/web_bg.wasm -o dist/js/web_bg.wasm
+          wasm-opt -Oz dist/js/storage-worker_bg.wasm -o dist/js/storage-worker_bg.wasm
+          wasm-opt -Oz dist/js/prover-worker_bg.wasm -o dist/js/prover-worker_bg.wasm
+          ls -lh dist/js/*.wasm
 
       - name: Bundle JS with esbuild
         run: |

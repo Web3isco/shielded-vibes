@@ -228,7 +228,7 @@ impl WebClient {
 
     pub async fn ping_storage(&self) -> anyhow::Result<()> {
         let mut bridge = self.storage_bridge.fork();
-        let resp = with_timeout(5_000, bridge.run(StorageWorkerRequest::Ping)).await?;
+        let resp = with_timeout(30_000, bridge.run(StorageWorkerRequest::Ping)).await?;
         match resp {
             StorageWorkerResponse::Pong => Ok(()),
             StorageWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
@@ -241,7 +241,7 @@ impl WebClient {
 
     pub async fn ping_prover(&self) -> anyhow::Result<()> {
         let mut bridge = self.prover_bridge.fork();
-        let resp = with_timeout(5_000, bridge.run(ProverWorkerRequest::Ping)).await?;
+        let resp = with_timeout(30_000, bridge.run(ProverWorkerRequest::Ping)).await?;
         match resp {
             ProverWorkerResponse::Pong => Ok(()),
             ProverWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
@@ -864,7 +864,7 @@ impl WebClient {
 impl stellar::ContractDataStorage for WebClient {
     async fn get_sync_state(&self) -> anyhow::Result<Vec<types::SyncMetadata>> {
         let mut bridge = self.storage_bridge.fork();
-        let resp = with_timeout(5_000, bridge.run(StorageWorkerRequest::SyncState)).await?;
+        let resp = with_timeout(30_000, bridge.run(StorageWorkerRequest::SyncState)).await?;
         match resp {
             StorageWorkerResponse::SyncState(state) => Ok(state),
             StorageWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
