@@ -4,7 +4,7 @@
  */
 
 import { connectWallet, getWalletNetwork, startWalletWatcher } from '../wallet.js';
-import { getHandle, initializeWasm } from '../wasm-facade.js';
+import { getHandle, initializeWasm, withRetry } from '../wasm-facade.js';
 import { App, Utils, Toast } from './core.js';
 import { setTabsRef } from './templates.js';
 import { runOnboardingWizard } from './onboarding-wizard.js';
@@ -208,17 +208,19 @@ export const Wallet = {
             const address = await connectWallet();
 
             const { network, networkPassphrase, sorobanRpcUrl } = await getWalletNetwork();
-            const rpcUrl = sorobanRpcUrl || '';
 
-            if (!rpcUrl.toLowerCase().includes('testnet')) {
+            if (!sorobanRpcUrl || !sorobanRpcUrl.toLowerCase().includes('testnet')) {
                 Toast.show('This app works only on Stellar testnet. Please switch Freighter to testnet.', 'error', 8000);
                 this.disconnect();
                 return;
             }
 
+            // Use the stable testnet endpoint for reliability on average PCs
+            const STABLE_RPC = 'https://soroban-testnet.stellar.org';
+
             App.state.wallet.connected = true;
             App.state.wallet.address = address;
-            App.state.wallet.sorobanRpcUrl = rpcUrl;
+            App.state.wallet.sorobanRpcUrl = STABLE_RPC;
             App.state.wallet.network = network;
             App.state.wallet.networkPassphrase = networkPassphrase;
 
@@ -226,7 +228,10 @@ export const Wallet = {
 
             setButtonLoading('Loading WASM...');
             try {
-                await initializeWasm(rpcUrl);
+                await withRetry(
+                    () => initializeWasm(rpcUrl),
+                    { maxAttempts: 3, baseDelayMs: 2000, label: 'WASM init' },
+                );
             } catch (e) {
                 let msg = e?.message || 'Failed to initialize WASM';
 

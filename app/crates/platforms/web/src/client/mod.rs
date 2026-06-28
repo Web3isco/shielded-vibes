@@ -241,7 +241,7 @@ impl WebClient {
 
     pub async fn ping_prover(&self) -> anyhow::Result<()> {
         let mut bridge = self.prover_bridge.fork();
-        let resp = with_timeout(60_000, bridge.run(ProverWorkerRequest::Ping)).await?;
+        let resp = with_timeout(120_000, bridge.run(ProverWorkerRequest::Ping)).await?;
         match resp {
             ProverWorkerResponse::Pong => Ok(()),
             ProverWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
@@ -789,7 +789,7 @@ impl WebClient {
         };
 
         let receipt = match self
-            .prover_request(ProverWorkerRequest::Disclosure(prover_req), 20_000)
+            .prover_request(ProverWorkerRequest::Disclosure(prover_req), 90_000)
             .await?
         {
             ProverWorkerResponse::Disclosure(receipt) => receipt,
@@ -820,7 +820,7 @@ impl WebClient {
         let proof_verified = match self
             .prover_request(
                 ProverWorkerRequest::VerifyDisclosureProof(receipt.clone(), expected_vk_hash),
-                20_000,
+                90_000,
             )
             .await?
         {

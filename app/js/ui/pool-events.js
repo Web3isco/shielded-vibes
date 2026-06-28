@@ -91,7 +91,11 @@ export const PoolEvents = {
 
         showLoading();
         try {
-            const rows = await getHandle().webClient.getRecentPoolActivity(3);
+            const { withRetry } = await import('../wasm-facade.js');
+            const rows = await withRetry(
+                () => getHandle().webClient.getRecentPoolActivity(3),
+                { maxAttempts: 3, baseDelayMs: 1000, label: 'pool-events refresh' },
+            );
             const list = Array.isArray(rows) ? rows : [];
 
             hideLoading();

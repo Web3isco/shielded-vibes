@@ -846,6 +846,13 @@ document.addEventListener('DOMContentLoaded', () => {
   logWithEmoji('INIT', '🚀 Shielded Vibes enhancement layer starting...');
   logWithEmoji('INIT', `User agent: ${navigator.userAgent.slice(0, 80)}`);
 
+  // Warn if running on a low-end CPU (4 or fewer logical cores)
+  const cpuCores = navigator.hardwareConcurrency;
+  if (cpuCores && cpuCores <= 4) {
+    console.warn(`[Shielded Vibes] Low-end CPU detected: ${cpuCores} logical cores. ZK proof generation may take 60-120 seconds on your device.`);
+    logWithEmoji('INIT', `⚠ Low-end CPU (${cpuCores} cores) — proof generation may be slow`);
+  }
+
   initParticles();
   seedMockActivity();
   initQuickAmounts();

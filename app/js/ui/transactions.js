@@ -215,7 +215,14 @@ async function prepareExecuteContext(btn) {
         throw new Error('Wallet network passphrase unavailable');
     }
     setLoading(btn, 'Validating…');
-    const onStatus = p => p?.message && setLoadingText(btn, p.message);
+    const onStatus = p => {
+        if (p?.message) {
+            const msg = p.message.includes('Proving') || p.message.includes('proving')
+                ? `Generating ZK Proof... ${p.message}`
+                : p.message;
+            setLoadingText(btn, msg);
+        }
+    };
     const config = await getContractConfig();
     const poolContractId = getActivePoolContractId(config);
     const client = getHandle().webClient;
@@ -295,7 +302,9 @@ async function executeFromAmount(ctx, { btn, amountInputId, run }) {
     );
     if (stepCount == null) return undefined;
 
-    setLoadingText(btn, stepCount === 1 ? 'Proving…' : `Proving (1/${stepCount})…`);
+    setLoadingText(btn, stepCount === 1
+        ? 'Generating ZK Proof... This may take 30-90 seconds'
+        : `Generating ZK Proof (1/${stepCount})...`);
     return run(ctx, amountRes.value);
 }
 
@@ -605,7 +614,7 @@ export const Transactions = {
                 }
 
                 const ctx = await prepareExecuteContext(btn);
-                setLoadingText(btn, 'Proving…');
+                setLoadingText(btn, 'Generating ZK Proof... This may take 30-90 seconds');
                 const hashes = await ctx.client.executeDeposit(
                     ctx.poolContractId,
                     ctx.userAddress,
@@ -652,7 +661,7 @@ export const Transactions = {
                         throw new Error('Selected notes must have a positive total');
                     }
 
-                    setLoadingText(btn, 'Proving…');
+                    setLoadingText(btn, 'Generating ZK Proof... This may take 30-90 seconds');
                     hashes = await ctx.client.executeTransact(
                         ctx.poolContractId,
                         ctx.userAddress,
@@ -727,7 +736,7 @@ export const Transactions = {
 
                     const outputAmounts = collectOutputAmounts('transfer-outputs');
 
-                    setLoadingText(btn, 'Proving…');
+                    setLoadingText(btn, 'Generating ZK Proof... This may take 30-90 seconds');
                     hashes = await ctx.client.executeTransact(
                         ctx.poolContractId,
                         ctx.userAddress,
@@ -808,7 +817,7 @@ export const Transactions = {
                 const outputAmounts = collectOutputAmounts('transact-outputs');
                 const { noteKeys, encKeys } = collectAdvancedRecipients('transact-outputs');
 
-                setLoadingText(btn, 'Proving…');
+                setLoadingText(btn, 'Generating ZK Proof... This may take 30-90 seconds');
                 const hashes = await ctx.client.executeTransact(
                     ctx.poolContractId,
                     ctx.userAddress,
