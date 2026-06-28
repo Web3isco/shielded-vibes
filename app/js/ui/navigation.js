@@ -215,12 +215,13 @@ export const Wallet = {
                 return;
             }
 
-            // Use the stable testnet endpoint for reliability on average PCs
+            // Hardcode the stable testnet endpoint; Freighter's RPC may be unreliable
             const STABLE_RPC = 'https://soroban-testnet.stellar.org';
+            const rpcUrl = STABLE_RPC;
 
             App.state.wallet.connected = true;
             App.state.wallet.address = address;
-            App.state.wallet.sorobanRpcUrl = STABLE_RPC;
+            App.state.wallet.sorobanRpcUrl = rpcUrl;
             App.state.wallet.network = network;
             App.state.wallet.networkPassphrase = networkPassphrase;
 
