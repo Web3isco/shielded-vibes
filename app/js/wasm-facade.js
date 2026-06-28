@@ -4,11 +4,11 @@ const STABLE_TESTNET_RPC = 'https://soroban-testnet.stellar.org';
 
 let handle = null;
 
-export async function initializeWasm(rpcUrl, bootnodeUrl = null) {
+export async function initializeWasm(_rpcUrl, bootnodeUrl = null) {
     if (handle) return handle; // Prevent double initialization
 
-    // Ensure we always use the stable testnet RPC endpoint
-    const effectiveRpc = rpcUrl || STABLE_TESTNET_RPC;
+    // Always use the stable testnet RPC endpoint regardless of what's passed
+    const effectiveRpc = STABLE_TESTNET_RPC;
     const effectiveBootnode = bootnodeUrl || undefined;
 
     await init();

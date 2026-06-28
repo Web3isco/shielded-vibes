@@ -230,7 +230,7 @@ export const Wallet = {
             setButtonLoading('Loading WASM...');
             try {
                 await withRetry(
-                    () => initializeWasm(rpcUrl),
+                    () => initializeWasm(),
                     { maxAttempts: 3, baseDelayMs: 2000, label: 'WASM init' },
                 );
             } catch (e) {
@@ -246,7 +246,7 @@ export const Wallet = {
                         });
                         if (modal?.accepted && modal?.url) {
                             setButtonLoading('Loading WASM (bootnode)...');
-                            await initializeWasm(rpcUrl, modal.url);
+                            await initializeWasm(null, modal.url);
                             try {
                                 await getHandle().webClient.setBootnodeConfig(modal.url);
                             } catch (saveErr) {
