@@ -731,11 +731,18 @@ impl Storage {
         }
 
         if current_ledger < sync_meta.last_fully_indexed_ledger {
-            anyhow::bail!(
-                "indexer metadata is ahead of chain tip: local={}, chain={}",
+            log::warn!(
+                "indexer metadata is ahead of chain tip: local={}, chain={} — capping to chain tip",
                 sync_meta.last_fully_indexed_ledger,
                 current_ledger
             );
+            self.conn.execute(
+                "UPDATE indexing_metadata
+                 SET last_fully_indexed_ledger = ?1,
+                     last_indexed_ledger = ?1
+                 WHERE contract_id = (SELECT contract_id FROM contracts WHERE address = ?2)",
+                params![current_ledger, asp_membership_contract_id],
+            )?;
         }
 
         // Get the last stored root for the ASP membership tree and the ledger
