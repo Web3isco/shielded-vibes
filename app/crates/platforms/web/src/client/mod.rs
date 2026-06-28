@@ -241,7 +241,7 @@ impl WebClient {
 
     pub async fn ping_prover(&self) -> anyhow::Result<()> {
         let mut bridge = self.prover_bridge.fork();
-        let resp = with_timeout(30_000, bridge.run(ProverWorkerRequest::Ping)).await?;
+        let resp = with_timeout(60_000, bridge.run(ProverWorkerRequest::Ping)).await?;
         match resp {
             ProverWorkerResponse::Pong => Ok(()),
             ProverWorkerResponse::Error(e) => Err(anyhow::anyhow!(e)),
