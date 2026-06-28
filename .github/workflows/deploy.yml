@@ -57,22 +57,22 @@ jobs:
         run: cargo install wasm-bindgen-cli --version 0.2.120 --locked
 
       - name: Build circuit artifacts
-        run: cargo build -p circuits --release
+        run: cargo build -p circuits
 
       - name: Build WASM targets
         run: |
-          cargo build --release -p web --target wasm32-unknown-unknown
-          cargo build --release -p web --target wasm32-unknown-unknown --bin storage-worker
-          cargo build --release -p web --target wasm32-unknown-unknown --bin prover-worker
+          cargo build -p web --target wasm32-unknown-unknown
+          cargo build -p web --target wasm32-unknown-unknown --bin storage-worker
+          cargo build -p web --target wasm32-unknown-unknown --bin prover-worker
 
       - name: Run wasm-bindgen
         run: |
           mkdir -p dist/js
-          wasm-bindgen target/wasm32-unknown-unknown/release/web.wasm \
+          wasm-bindgen target/wasm32-unknown-unknown/debug/web.wasm \
             --out-dir dist/js --out-name web --target web
-          wasm-bindgen target/wasm32-unknown-unknown/release/storage-worker.wasm \
+          wasm-bindgen target/wasm32-unknown-unknown/debug/storage-worker.wasm \
             --out-dir dist/js --out-name storage-worker --target web
-          wasm-bindgen target/wasm32-unknown-unknown/release/prover-worker.wasm \
+          wasm-bindgen target/wasm32-unknown-unknown/debug/prover-worker.wasm \
             --out-dir dist/js --out-name prover-worker --target web
 
       - name: Bundle JS with esbuild
@@ -90,8 +90,8 @@ jobs:
           mkdir -p dist/css dist/assets dist/circuits
 
           # Copy circuit artifacts (needed at runtime for proving)
-          cp target/circuits-artifacts/release/*.r1cs dist/circuits/ 2>/dev/null || true
-          cp target/circuits-artifacts/release/*.wasm dist/circuits/ 2>/dev/null || true
+          cp target/circuits-artifacts/debug/*.r1cs dist/circuits/ 2>/dev/null || true
+          cp target/circuits-artifacts/debug/*.wasm dist/circuits/ 2>/dev/null || true
 
           # Static files
           cp app/css/vibes.css dist/css/vibes.css

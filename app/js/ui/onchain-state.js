@@ -133,11 +133,7 @@ export const OnchainState = {
         this._refreshing = true;
         try {
             hideError();
-            const { withRetry } = await import('../wasm-facade.js');
-            const data = await withRetry(
-                () => getHandle().webClient.allContractsData(),
-                { maxAttempts: 3, baseDelayMs: 1000, label: 'onchain-state refresh' },
-            );
+            const data = await getHandle().webClient.allContractsData();
             const pools = Array.isArray(data?.pools) ? data.pools : [];
             const primaryPool = pools.find(p => p?.enabled) || pools[0] || null;
 

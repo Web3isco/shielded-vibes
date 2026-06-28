@@ -243,7 +243,7 @@ impl WebClient {
             .map_err(|e| JsError::new(&format!("failed to load prover: {e:?}")))?;
 
         let prepared = match self
-            .prover_request(ProverWorkerRequest::Transact(params), 90_000)
+            .prover_request(ProverWorkerRequest::Transact(params), 20_000)
             .await?
         {
             ProverWorkerResponse::TransactPrepared(p) => p,

@@ -4,7 +4,7 @@
  */
 
 import { connectWallet, getWalletNetwork, startWalletWatcher } from '../wallet.js';
-import { getHandle, initializeWasm, withRetry } from '../wasm-facade.js';
+import { getHandle, initializeWasm } from '../wasm-facade.js';
 import { App, Utils, Toast } from './core.js';
 import { setTabsRef } from './templates.js';
 import { runOnboardingWizard } from './onboarding-wizard.js';
@@ -208,16 +208,13 @@ export const Wallet = {
             const address = await connectWallet();
 
             const { network, networkPassphrase, sorobanRpcUrl } = await getWalletNetwork();
+            const rpcUrl = sorobanRpcUrl || '';
 
-            if (!sorobanRpcUrl || !sorobanRpcUrl.toLowerCase().includes('testnet')) {
+            if (!rpcUrl.toLowerCase().includes('testnet')) {
                 Toast.show('This app works only on Stellar testnet. Please switch Freighter to testnet.', 'error', 8000);
                 this.disconnect();
                 return;
             }
-
-            // Hardcode the stable testnet endpoint; Freighter's RPC may be unreliable
-            const STABLE_RPC = 'https://soroban-testnet.stellar.org';
-            const rpcUrl = STABLE_RPC;
 
             App.state.wallet.connected = true;
             App.state.wallet.address = address;
@@ -229,10 +226,7 @@ export const Wallet = {
 
             setButtonLoading('Loading WASM...');
             try {
-                await withRetry(
-                    () => initializeWasm(),
-                    { maxAttempts: 3, baseDelayMs: 2000, label: 'WASM init' },
-                );
+                await initializeWasm(rpcUrl);
             } catch (e) {
                 let msg = e?.message || 'Failed to initialize WASM';
 
@@ -246,7 +240,7 @@ export const Wallet = {
                         });
                         if (modal?.accepted && modal?.url) {
                             setButtonLoading('Loading WASM (bootnode)...');
-                            await initializeWasm(null, modal.url);
+                            await initializeWasm(rpcUrl, modal.url);
                             try {
                                 await getHandle().webClient.setBootnodeConfig(modal.url);
                             } catch (saveErr) {
